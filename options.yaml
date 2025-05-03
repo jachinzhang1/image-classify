@@ -1,0 +1,18 @@
+device: cuda
+data_root: ./data
+
+model_types:
+  - attention_cnn
+
+selected_model: attention_cnn
+num_classes: 10
+
+train:
+  n_epochs: 5
+  batch_size: 64
+  lr: !!float 1e-3
+  output_dir: ./ckpts
+
+test:
+  batch_size: 64
+  ckpt_path: ckpts\attention_cnn\20250503-111234\model.pth
