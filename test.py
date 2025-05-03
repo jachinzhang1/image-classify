@@ -1,14 +1,16 @@
-import os
 import torch
-import numpy as np
-import torch.nn as nn
-from tqdm import tqdm
+from typing import Optional
 from configs import Configs
 from dataset import get_dataloader
 from model.attention_cnn import AttentionCNN
 
 
-def main(cfg: Configs):
+def main(
+    cfg: Configs,
+    controller: Optional[object] = None,
+    progress_callback: Optional[object] = None,
+    accuracy_callback: Optional[object] = None,
+):
     device = cfg.device
     dataloader = get_dataloader(
         cfg.data_root, cfg.test_config["batch_size"], train=False
@@ -23,13 +25,22 @@ def main(cfg: Configs):
     model.eval()
     correct, total_samples = 0, 0
     with torch.no_grad():
-        for images, labels in tqdm(dataloader, total=len(dataloader)):
+        for i, (images, labels) in enumerate(dataloader):
+            if controller and getattr(controller, "should_stop", False):
+                print("Testing cancelled by user.")
+                return
+
             images, labels = images.to(device), labels.to(device)
             outputs = model(images)
             correct += (outputs.argmax(1) == labels).sum().item()
             total_samples += labels.size(0)
 
+            if progress_callback:
+                progress_callback.emit(i + 1, len(dataloader))
+
     acc = correct / total_samples
+    if accuracy_callback:
+        accuracy_callback.emit(acc)
     print(f"Acc: {acc:.4f}")
 
 
