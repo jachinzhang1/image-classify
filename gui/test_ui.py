@@ -234,7 +234,7 @@ class TestApp(QMainWindow):
 
     def browse_ckpt_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Select Checkpoint File", "", "Model Files (*.pth *.pt)"
+            self, "Select Checkpoint File", "./ckpts", "Model Files (*.pth *.pt)"
         )
         if file_path:
             self.ckpt_path_edit.setText(file_path)

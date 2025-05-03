@@ -111,7 +111,7 @@ class SingleImageApp(QMainWindow):
 
     def browse_ckpt_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Select Checkpoint File", "", "Model Files (*.pth *.pt)"
+            self, "Select Checkpoint File", "./ckpts", "Model Files (*.pth *.pt)"
         )
         if file_path:
             self.ckpt_path_edit.setText(file_path)
@@ -119,7 +119,7 @@ class SingleImageApp(QMainWindow):
 
     def browse_image_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Select Image File", "", "Image Files (*.png *.jpg *.jpeg)"
+            self, "Select Image File", "./images", "Image Files (*.png *.jpg *.jpeg)"
         )
         if file_path:
             self.image_path_edit.setText(file_path)
