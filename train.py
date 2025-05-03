@@ -9,6 +9,7 @@ from datetime import datetime
 from configs import Configs
 from dataset import get_dataloader
 from model.attention_cnn import AttentionCNN
+from model.resnet import ResNet18, ResNet34, ResNet50, ResNet101, ResNet152, ResNet20, ResNet32, ResNet44, ResNet56, ResNet110, ResNet1202
 
 
 def main(
@@ -23,11 +24,34 @@ def main(
 
     if cfg.selected_model == "attention_cnn":
         model = AttentionCNN(num_classes=cfg.num_classes).to(device)
+    elif cfg.selected_model == "resnet18":
+        model = ResNet18(num_classes=cfg.num_classes).to(device)
+    elif cfg.selected_model == "resnet34":
+        model = ResNet34(num_classes=cfg.num_classes).to(device)
+    elif cfg.selected_model == "resnet50":
+        model = ResNet50(num_classes=cfg.num_classes).to(device)
+    elif cfg.selected_model == "resnet101":
+        model = ResNet101(num_classes=cfg.num_classes).to(device)
+    elif cfg.selected_model == "resnet152":
+        model = ResNet152(num_classes=cfg.num_classes).to(device)
+    elif cfg.selected_model == "resnet20":
+        model = ResNet20(num_classes=cfg.num_classes).to(device)
+    elif cfg.selected_model == "resnet32":
+        model = ResNet32(num_classes=cfg.num_classes).to(device)
+    elif cfg.selected_model == "resnet44":
+        model = ResNet44(num_classes=cfg.num_classes).to(device)
+    elif cfg.selected_model == "resnet56":
+        model = ResNet56(num_classes=cfg.num_classes).to(device)
+    elif cfg.selected_model == "resnet110":
+        model = ResNet110(num_classes=cfg.num_classes).to(device)
+    elif cfg.selected_model == "resnet1202":
+        model = ResNet1202(num_classes=cfg.num_classes).to(device)
     else:
         raise ValueError("Unsupported model type.")
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.training_config["lr"])
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=cfg.training_config["lr"])
     model.train()
     n_epochs = cfg.training_config["n_epochs"]
     total_iterations = n_epochs * len(dataloader)
@@ -47,7 +71,8 @@ def main(
 
             if progress_callback:
                 progress_callback.emit(
-                    epoch * len(dataloader) + i + 1, total_iterations, epoch + 1
+                    epoch * len(dataloader) + i +
+                    1, total_iterations, epoch + 1
                 )
 
             images, labels = images.to(device), labels.to(device)

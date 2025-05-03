@@ -3,6 +3,17 @@ data_root: ./data
 
 model_types:
   - attention_cnn
+  - resnet18
+  - resnet34
+  - resnet50
+  - resnet101
+  - resnet152
+  - resnet20
+  - resnet32
+  - resnet44
+  - resnet56
+  - resnet110
+  - resnet1202
 
 selected_model: attention_cnn
 num_classes: 10
