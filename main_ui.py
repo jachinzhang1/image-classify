@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (
 )
 from gui.train_ui import TrainingApp
 from gui.test_ui import TestApp
+from gui.single_image_ui import SingleImageApp
 
 class MainApp(QMainWindow):
     def __init__(self):
@@ -43,14 +44,17 @@ class MainApp(QMainWindow):
         # Create instances of both UIs
         self.train_ui = TrainingApp()
         self.test_ui = TestApp()
+        self.single_image_ui = SingleImageApp()
         
         # Remove their main window properties
         self.train_ui.setParent(None)
         self.test_ui.setParent(None)
+        self.single_image_ui.setParent(None)
         
         # Add them as tabs
         self.tabs.addTab(self.train_ui.central_widget, "Training")
-        self.tabs.addTab(self.test_ui.central_widget, "Testing")
+        self.tabs.addTab(self.test_ui.central_widget, "Dataset Test")
+        self.tabs.addTab(self.single_image_ui.central_widget, "Single Image Test")
         
         layout.addWidget(self.tabs)
         self.central_widget.setLayout(layout)
