@@ -1,10 +1,8 @@
 import os
-import json
 import torch
 import numpy as np
 import torch.nn as nn
 from time import time
-from tqdm import tqdm
 from typing import Optional
 from pprint import pprint
 from datetime import datetime
@@ -23,7 +21,6 @@ def main(
         cfg.data_root, cfg.training_config["batch_size"], train=True
     )
 
-    assert cfg.selected_model in cfg.model_types
     if cfg.selected_model == "attention_cnn":
         model = AttentionCNN(num_classes=cfg.num_classes).to(device)
     else:

@@ -15,7 +15,7 @@ def main(
     dataloader = get_dataloader(
         cfg.data_root, cfg.test_config["batch_size"], train=False
     )
-    assert cfg.selected_model in cfg.model_types
+
     if cfg.selected_model == "attention_cnn":
         model = AttentionCNN(num_classes=cfg.num_classes).to(device)
     else:

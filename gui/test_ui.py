@@ -86,7 +86,8 @@ class TestApp(QMainWindow):
                 width: 10px;
             }
         """
-        self.setStyleSheet("""
+        self.setStyleSheet(
+            """
             QWidget {
                 font-family: 'Microsoft YaHei';
                 font-size: 12pt;
@@ -103,7 +104,8 @@ class TestApp(QMainWindow):
                 min-height: 30px;
                 font-size: 12pt;
             }
-        """)
+        """
+        )
 
         self.config_path = "options.yaml"
         self.default_config = self.load_config()
@@ -253,15 +255,34 @@ class TestApp(QMainWindow):
                 self.set_ui_enabled(True)
 
     def start_testing(self):
+        ckpt_path = os.path.abspath(self.ckpt_path_edit.text())
+        model_types = self.default_config.get("model_types", ["attention_cnn"])
+
+        # Find model type that matches checkpoint path
+        selected_model = None
+        for model in model_types:
+            if model.lower() in ckpt_path.lower():
+                selected_model = model
+                break
+
+        if not selected_model:
+            QMessageBox.warning(
+                self,
+                "Error",
+                "Could not determine model type from checkpoint path.\n"
+                f"Path should contain one of: {', '.join(model_types)}",
+            )
+            return
+
         config_dict = {
             "device": "cuda" if self.device_gpu.isChecked() else "cpu",
             "data_root": os.path.abspath(self.data_root_edit.text()),
             "num_classes": self.num_classes_spin.value(),
-            "model_types": ["attention_cnn"],
-            "selected_model": "attention_cnn",
+            "model_types": model_types,
+            "selected_model": selected_model,
             "test": {
                 "batch_size": self.batch_size_spin.value(),
-                "ckpt_path": os.path.abspath(self.ckpt_path_edit.text()),
+                "ckpt_path": ckpt_path,
             },
         }
 

@@ -19,6 +19,7 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QButtonGroup,
     QProgressBar,
+    QComboBox,
 )
 from PyQt5.QtCore import QThread, pyqtSignal, QObject
 
@@ -84,7 +85,8 @@ class TrainingApp(QMainWindow):
                 width: 10px;
             }
         """
-        self.setStyleSheet("""
+        self.setStyleSheet(
+            """
             QWidget {
                 font-family: 'Microsoft YaHei';
                 font-size: 12pt;
@@ -101,8 +103,9 @@ class TrainingApp(QMainWindow):
                 min-height: 30px;
                 font-size: 12pt;
             }
-        """)
-        
+        """
+        )
+
         self.config_path = "options.yaml"
         self.default_config = self.load_config()
         self.init_ui()
@@ -184,6 +187,10 @@ class TrainingApp(QMainWindow):
         model_layout = QVBoxLayout()
         model_layout.addWidget(QLabel("<b>Model Settings</b>"))
 
+        self.model_combo = QComboBox()
+        model_layout.addWidget(QLabel("Model Type:"))
+        model_layout.addWidget(self.model_combo)
+
         self.num_classes_spin = QSpinBox()
         self.num_classes_spin.setRange(1, 1000)
         model_layout.addWidget(QLabel("Number of Classes:"))
@@ -216,7 +223,7 @@ class TrainingApp(QMainWindow):
         self.cancel_btn.clicked.connect(self.cancel_training)  # Add click handler
         control_layout.addWidget(self.cancel_btn)
         layout.addLayout(control_layout)
-        
+
         # Progress bar
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
@@ -243,6 +250,18 @@ class TrainingApp(QMainWindow):
             self.device_cpu.setChecked(True)
         else:
             self.device_gpu.setChecked(True)
+
+        # Load model types from config
+        self.model_combo.clear()
+        self.model_combo.addItems(
+            self.default_config.get("model_types", ["attention_cnn"])
+        )
+
+        # Set selected model
+        selected_model = self.default_config.get("selected_model", "attention_cnn")
+        index = self.model_combo.findText(selected_model)
+        if index >= 0:
+            self.model_combo.setCurrentIndex(index)
 
     def browse_data_dir(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Data Directory")
@@ -274,8 +293,8 @@ class TrainingApp(QMainWindow):
         config_dict = {
             "device": "cuda" if self.device_gpu.isChecked() else "cpu",
             "data_root": os.path.abspath(self.data_root_edit.text()),
-            "model_types": ["attention_cnn"],
-            "selected_model": "attention_cnn",
+            "model_types": self.default_config.get("model_types", ["attention_cnn"]),
+            "selected_model": self.model_combo.currentText(),
             "num_classes": self.num_classes_spin.value(),
             "train": {
                 "n_epochs": self.epochs_spin.value(),
@@ -305,7 +324,7 @@ class TrainingApp(QMainWindow):
         self.thread.terminated.connect(lambda: self.set_ui_enabled(True))
         self.thread.progress_update.connect(self.update_progress)
         self.thread.start()
-    
+
     def update_progress(self, current, total, epoch):
         progress = int((current / total) * 100) if total > 0 else 0
         self.progress_bar.setValue(progress)

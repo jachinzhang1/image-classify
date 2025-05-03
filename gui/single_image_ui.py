@@ -8,7 +8,6 @@ from PyQt5.QtWidgets import (
     QMainWindow,
     QWidget,
     QVBoxLayout,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
@@ -88,7 +87,7 @@ class SingleImageApp(QMainWindow):
         # Image display
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignCenter)
-        self.image_label.setMinimumSize(300, 600)
+        self.image_label.setMinimumSize(300, 700)
         self.image_label.setStyleSheet("border: 1px solid black;")
         image_layout.addWidget(self.image_label)
 
