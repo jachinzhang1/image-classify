@@ -1,5 +1,21 @@
 device: cuda
-data_root: ./data
+
+# Dataset configuration
+datasets:
+  cifar10:
+    path: ./data/cifar10
+    num_classes: 10
+    description: "CIFAR-10 image classification dataset with 10 classes"
+  cifar100:
+    path: ./data/cifar100
+    num_classes: 100
+    description: "CIFAR-100 image classification dataset with 100 classes"
+  mnist:
+    path: ./data/mnist
+    num_classes: 10
+    description: "MNIST handwritten digit recognition dataset with 10 classes"
+
+selected_dataset: cifar10
 
 model_types:
   - attention_cnn
@@ -16,14 +32,14 @@ model_types:
   - resnet1202
 
 selected_model: attention_cnn
-num_classes: 10
 
 train:
   n_epochs: 5
   batch_size: 64
   lr: !!float 1e-3
   output_dir: ./ckpts
+  early_stopping_patience: 10  # Number of epochs to wait before early stopping
 
 test:
   batch_size: 64
-  ckpt_path: ckpts\attention_cnn\20250503-111234\model.pth
+  ckpt_path: ckpts/cifar10/attention_cnn/latest.pth

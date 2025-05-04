@@ -18,8 +18,12 @@ def main(
     progress_callback: Optional[object] = None,
 ):
     device = cfg.device
+    # Use the selected dataset from config
     dataloader = get_dataloader(
-        cfg.data_root, cfg.training_config["batch_size"], train=True
+        cfg.data_root, 
+        cfg.training_config["batch_size"], 
+        dataset_name=cfg.selected_dataset,
+        train=True
     )
 
     if cfg.selected_model == "attention_cnn":
@@ -56,6 +60,22 @@ def main(
     n_epochs = cfg.training_config["n_epochs"]
     total_iterations = n_epochs * len(dataloader)
 
+    # Create output directory with hierarchical structure: dataset/model_type
+    output_base = os.path.join(
+        cfg.training_config["output_dir"],
+        cfg.selected_dataset,   # First level: dataset name
+        cfg.selected_model      # Second level: model type
+    )
+    os.makedirs(output_base, exist_ok=True)
+
+    # Early stopping parameters
+    patience = cfg.training_config.get("early_stopping_patience", 10)  # Get from config or use default
+    wait = 0       # Counter for patience
+    best_acc = 0.0
+    best_epoch = 0
+    best_state_dict = None
+
+    # Training loop
     for epoch in range(n_epochs):
         if controller and getattr(controller, "should_stop", False):
             print("Training cancelled by user.")
@@ -93,16 +113,52 @@ def main(
         print(
             f"Epoch {epoch+1}/{n_epochs} Loss: {epoch_loss:.3f} Acc: {epoch_acc:.2f} Time: {toc-tic:.1f}s"
         )
+        
+        # Check if this is the best model so far
+        if epoch_acc > best_acc:
+            best_acc = epoch_acc
+            best_epoch = epoch
+            best_state_dict = model.state_dict().copy()
+            
+            # No need to save best.pth, we'll save it at the end
+            print(f"Found new best model with accuracy: {best_acc:.4f} at epoch {epoch+1}")
+            
+            # Reset patience counter
+            wait = 0
+        else:
+            # Increment patience counter
+            wait += 1
+            print(f"No improvement for {wait} epochs. Best accuracy: {best_acc:.4f} at epoch {best_epoch+1}")
+            
+            # Check if we should stop early
+            if wait >= patience:
+                print(f"Early stopping at epoch {epoch+1}. No improvement for {patience} epochs.")
+                break
 
+    # If we have a best model (which we should), load it back
+    if best_state_dict is not None:
+        model.load_state_dict(best_state_dict)
+        print(f"Loaded best model from epoch {best_epoch+1} with accuracy {best_acc:.4f}")
+
+    # Save the best model in a timestamped directory
     curr_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-    save_dir = os.path.join(
-        cfg.training_config["output_dir"], cfg.selected_model, curr_time
-    )
+    save_dir = os.path.join(output_base, curr_time)
     os.makedirs(save_dir, exist_ok=True)
-    torch.save(model.state_dict(), os.path.join(save_dir, "model.pth"))
+    torch.save(best_state_dict, os.path.join(save_dir, "model.pth"))
+    print(f"Saved best model to {save_dir}/model.pth")
+    
+    # Also save a copy with standard name for easy testing
+    standard_path = os.path.join(output_base, "latest.pth")
+    torch.save(best_state_dict, standard_path)
+    print(f"Saved copy of best model to {standard_path}")
+    
+    # Always ensure we return the best model
+    return model, best_acc, best_epoch
 
 
 if __name__ == "__main__":
     config = Configs(config_path="options.yaml")
+    print("Training with configuration:")
     pprint(config.to_dict())
-    main(cfg=config)
+    model, best_acc, best_epoch = main(cfg=config)
+    print(f"Best model: Epoch {best_epoch+1}, Accuracy: {best_acc:.4f}")

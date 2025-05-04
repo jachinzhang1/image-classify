@@ -8,7 +8,7 @@ from gui.single_image_ui import SingleImageApp
 class MainApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Model Training & Testing Interface")
+        self.setWindowTitle("Image Classification Model Training & Testing Interface")
         self.setStyleSheet(
             """
             QWidget {

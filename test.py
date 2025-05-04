@@ -1,4 +1,5 @@
 import torch
+import os
 from typing import Optional
 from configs import Configs
 from dataset import get_dataloader
@@ -13,10 +14,24 @@ def main(
     accuracy_callback: Optional[object] = None,
 ):
     device = cfg.device
+    
+    # Use the selected dataset from config
     dataloader = get_dataloader(
-        cfg.data_root, cfg.test_config["batch_size"], train=False
+        cfg.data_root, 
+        cfg.test_config["batch_size"], 
+        dataset_name=cfg.selected_dataset,
+        train=False
     )
 
+    # Check if checkpoint exists
+    ckpt_path = cfg.test_config["ckpt_path"]
+    if not os.path.exists(ckpt_path):
+        print(f"Error: Checkpoint file {ckpt_path} not found.")
+        if accuracy_callback:
+            accuracy_callback.emit(0.0)
+        return
+
+    # Load model based on selected model type
     if cfg.selected_model == "attention_cnn":
         model = AttentionCNN(num_classes=cfg.num_classes).to(device)
     elif cfg.selected_model == "resnet18":
@@ -42,32 +57,72 @@ def main(
     elif cfg.selected_model == "resnet1202":
         model = ResNet1202(num_classes=cfg.num_classes).to(device)
     else:
-        raise ValueError("Unsupported model type.")
+        error_msg = f"Unsupported model type: {cfg.selected_model}"
+        print(error_msg)
+        raise ValueError(error_msg)
 
-    model.load_state_dict(torch.load(
-        cfg.test_config["ckpt_path"], map_location=device))
-    model.eval()
-    correct, total_samples = 0, 0
-    with torch.no_grad():
-        for i, (images, labels) in enumerate(dataloader):
-            if controller and getattr(controller, "should_stop", False):
-                print("Testing cancelled by user.")
-                return
+    try:
+        # Load the model weights
+        model.load_state_dict(torch.load(
+            cfg.test_config["ckpt_path"], map_location=device))
+        model.eval()
+        
+        # Perform evaluation
+        correct, total_samples = 0, 0
+        class_correct = [0] * cfg.num_classes
+        class_total = [0] * cfg.num_classes
+        
+        with torch.no_grad():
+            for i, (images, labels) in enumerate(dataloader):
+                if controller and getattr(controller, "should_stop", False):
+                    print("Testing cancelled by user.")
+                    return
 
-            images, labels = images.to(device), labels.to(device)
-            outputs = model(images)
-            correct += (outputs.argmax(1) == labels).sum().item()
-            total_samples += labels.size(0)
+                images, labels = images.to(device), labels.to(device)
+                outputs = model(images)
+                pred = outputs.argmax(1)
+                
+                # Overall accuracy
+                correct += (pred == labels).sum().item()
+                total_samples += labels.size(0)
+                
+                # Per-class accuracy
+                for j in range(labels.size(0)):
+                    label = labels[j].item()
+                    class_correct[label] += (pred[j] == label).item()
+                    class_total[label] += 1
 
-            if progress_callback:
-                progress_callback.emit(i + 1, len(dataloader))
+                if progress_callback:
+                    progress_callback.emit(i + 1, len(dataloader))
 
-    acc = correct / total_samples
-    if accuracy_callback:
-        accuracy_callback.emit(acc)
-    print(f"Acc: {acc:.4f}")
+        # Calculate and report accuracy
+        acc = correct / total_samples
+        if accuracy_callback:
+            accuracy_callback.emit(acc)
+            
+        print(f"Overall Accuracy: {acc:.4f}")
+        
+        # Print per-class accuracy
+        print("\nPer-class accuracy:")
+        for i in range(cfg.num_classes):
+            if class_total[i] > 0:
+                class_acc = class_correct[i] / class_total[i]
+                print(f"  Class {i}: {class_acc:.4f} ({class_correct[i]}/{class_total[i]})")
+            else:
+                print(f"  Class {i}: No samples")
+                
+    except Exception as e:
+        error_msg = f"Error during testing: {str(e)}"
+        print(error_msg)
+        if accuracy_callback:
+            accuracy_callback.emit(0.0)
+        raise Exception(error_msg)
 
 
 if __name__ == "__main__":
     config = Configs(config_path="options.yaml")
+    print("Testing with configuration:")
+    print(f"- Dataset: {config.selected_dataset}")
+    print(f"- Model: {config.selected_model}")
+    print(f"- Checkpoint: {config.test_config['ckpt_path']}")
     main(cfg=config)

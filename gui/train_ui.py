@@ -32,16 +32,24 @@ class TrainingThread(QThread):
     finished = pyqtSignal(bool)
     terminated = pyqtSignal()
     progress_update = pyqtSignal(int, int, int)  # current, total, epoch
+    best_model_update = pyqtSignal(float, int)   # accuracy, epoch
 
     def __init__(self, config, controller):
         super().__init__()
         self.config = config
         self.controller = controller
+        self.best_accuracy = 0.0
+        self.best_epoch = 0
 
     def run(self):
         try:
-            main(self.config, self.controller, self.progress_update)
+            model, best_acc, best_epoch = main(
+                self.config, self.controller, self.progress_update)
+            self.best_accuracy = best_acc
+            self.best_epoch = best_epoch
+
             if not self.controller.should_stop:
+                self.best_model_update.emit(best_acc, best_epoch)
                 self.finished.emit(True)
         except Exception as e:
             print(f"Training error: {e}")
@@ -117,7 +125,8 @@ class TrainingApp(QMainWindow):
             with open(self.config_path, "r") as f:
                 return yaml.safe_load(f)
         except FileNotFoundError:
-            print(f"Warning: {self.config_path} not found, using hardcoded defaults")
+            print(
+                f"Warning: {self.config_path} not found, using hardcoded defaults")
             return {
                 "device": "cuda",
                 "data_root": "./data",
@@ -138,10 +147,19 @@ class TrainingApp(QMainWindow):
         data_group.setMinimumWidth(600)
         data_layout = QVBoxLayout()
         data_layout.setSpacing(10)
-        data_layout.addWidget(QLabel("<b>Data Settings</b>"))
+        data_layout.addWidget(QLabel("<b>Dataset Settings</b>"))
+
+        # Add dataset selection dropdown
+        self.dataset_combo = QComboBox()
+        data_layout.addWidget(QLabel("Dataset:"))
+        data_layout.addWidget(self.dataset_combo)
+
+        # Add dataset description label
+        self.dataset_desc_label = QLabel("")
+        data_layout.addWidget(self.dataset_desc_label)
 
         self.data_root_edit = QLineEdit()
-        data_layout.addWidget(QLabel("Data Root:"))
+        data_layout.addWidget(QLabel("Data Directory:"))
         data_layout.addWidget(self.data_root_edit)
         browse_data_btn = QPushButton("Browse...")
         browse_data_btn.clicked.connect(self.browse_data_dir)
@@ -171,6 +189,12 @@ class TrainingApp(QMainWindow):
         self.lr_spin.setSingleStep(0.0001)  # Step size of 1e-4
         train_layout.addWidget(QLabel("Learning Rate:"))
         train_layout.addWidget(self.lr_spin)
+
+        # Add early stopping patience parameter
+        self.patience_spin = QSpinBox()
+        self.patience_spin.setRange(1, 100)
+        train_layout.addWidget(QLabel("Early Stopping Patience:"))
+        train_layout.addWidget(self.patience_spin)
 
         self.output_dir_edit = QLineEdit()
         train_layout.addWidget(QLabel("Output Directory:"))
@@ -220,7 +244,8 @@ class TrainingApp(QMainWindow):
         control_layout.addWidget(self.train_btn)
         self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.setEnabled(False)
-        self.cancel_btn.clicked.connect(self.cancel_training)  # Add click handler
+        self.cancel_btn.clicked.connect(
+            self.cancel_training)  # Add click handler
         control_layout.addWidget(self.cancel_btn)
         layout.addLayout(control_layout)
 
@@ -237,12 +262,45 @@ class TrainingApp(QMainWindow):
     def load_default_values(self):
         # Set values from config file
         cfg = self.default_config
-        self.data_root_edit.setText(cfg.get("data_root", "./data"))
+
+        # Load dataset list
+        self.dataset_combo.clear()
+        datasets = self.default_config.get("datasets", {})
+        if datasets:
+            self.dataset_combo.addItems(list(datasets.keys()))
+            # Set current selected dataset
+            selected_dataset = self.default_config.get(
+                "selected_dataset", "cifar10")
+            index = self.dataset_combo.findText(selected_dataset)
+            if index >= 0:
+                self.dataset_combo.setCurrentIndex(index)
+                # Show dataset description
+                if selected_dataset in datasets:
+                    self.dataset_desc_label.setText(
+                        datasets[selected_dataset].get("description", ""))
+
+            # Connect dataset change signal
+            self.dataset_combo.currentTextChanged.connect(
+                self.on_dataset_changed)
+
+            # Set data directory
+            if selected_dataset in datasets:
+                self.data_root_edit.setText(
+                    datasets[selected_dataset].get("path", "./data"))
+                # Set number of classes
+                self.num_classes_spin.setValue(
+                    datasets[selected_dataset].get("num_classes", 10))
+        else:
+            self.data_root_edit.setText(cfg.get("data_root", "./data"))
+            self.num_classes_spin.setValue(cfg.get("num_classes", 10))
+
         self.epochs_spin.setValue(cfg["train"].get("n_epochs", 5))
         self.batch_size_spin.setValue(cfg["train"].get("batch_size", 64))
         self.lr_spin.setValue(float(cfg["train"].get("lr", 0.001)))
+        # Set patience value for early stopping
+        self.patience_spin.setValue(
+            cfg["train"].get("early_stopping_patience", 10))
         self.output_dir_edit.setText(cfg["train"].get("output_dir", "./ckpts"))
-        self.num_classes_spin.setValue(cfg.get("num_classes", 10))
 
         # Set device radio button
         device = cfg.get("device", "cuda").lower()
@@ -258,18 +316,21 @@ class TrainingApp(QMainWindow):
         )
 
         # Set selected model
-        selected_model = self.default_config.get("selected_model", "attention_cnn")
+        selected_model = self.default_config.get(
+            "selected_model", "attention_cnn")
         index = self.model_combo.findText(selected_model)
         if index >= 0:
             self.model_combo.setCurrentIndex(index)
 
     def browse_data_dir(self):
-        dir_path = QFileDialog.getExistingDirectory(self, "Select Data Directory")
+        dir_path = QFileDialog.getExistingDirectory(
+            self, "Select Data Directory")
         if dir_path:
             self.data_root_edit.setText(dir_path)
 
     def browse_output_dir(self):
-        dir_path = QFileDialog.getExistingDirectory(self, "Select Output Directory")
+        dir_path = QFileDialog.getExistingDirectory(
+            self, "Select Output Directory")
         if dir_path:
             self.output_dir_edit.setText(dir_path)
 
@@ -288,18 +349,35 @@ class TrainingApp(QMainWindow):
                 self.progress_label.setText("Training cancelled.")
                 self.set_ui_enabled(True)
 
+    def on_dataset_changed(self, dataset_name):
+        """Handle dataset selection change"""
+        datasets = self.default_config.get("datasets", {})
+        if dataset_name in datasets:
+            dataset_config = datasets[dataset_name]
+            # Update data directory
+            self.data_root_edit.setText(dataset_config.get("path", "./data"))
+            # Update number of classes
+            self.num_classes_spin.setValue(
+                dataset_config.get("num_classes", 10))
+            # Update description
+            self.dataset_desc_label.setText(
+                dataset_config.get("description", ""))
+
     def start_training(self):
         # Create config dictionary
+        selected_dataset = self.dataset_combo.currentText()
+
         config_dict = {
             "device": "cuda" if self.device_gpu.isChecked() else "cpu",
-            "data_root": os.path.abspath(self.data_root_edit.text()),
+            "datasets": self.default_config.get("datasets", {}),
+            "selected_dataset": selected_dataset,
             "model_types": self.default_config.get("model_types", ["attention_cnn"]),
             "selected_model": self.model_combo.currentText(),
-            "num_classes": self.num_classes_spin.value(),
             "train": {
                 "n_epochs": self.epochs_spin.value(),
                 "batch_size": self.batch_size_spin.value(),
                 "lr": float(self.lr_spin.value()),
+                "early_stopping_patience": self.patience_spin.value(),
                 "output_dir": os.path.abspath(self.output_dir_edit.text()),
             },
         }
@@ -323,12 +401,20 @@ class TrainingApp(QMainWindow):
         self.thread.finished.connect(self.training_finished)
         self.thread.terminated.connect(lambda: self.set_ui_enabled(True))
         self.thread.progress_update.connect(self.update_progress)
+        self.thread.best_model_update.connect(self.update_best_model)
         self.thread.start()
 
     def update_progress(self, current, total, epoch):
         progress = int((current / total) * 100) if total > 0 else 0
         self.progress_bar.setValue(progress)
-        self.progress_label.setText(f"Epoch {epoch} - {current}/{total} iterations")
+        self.progress_label.setText(
+            f"Epoch {epoch} - {current}/{total} iterations")
+
+    def update_best_model(self, accuracy, epoch):
+        self.progress_bar.setStyleSheet(self.normal_style)
+        self.progress_label.setText(
+            f"Best model from epoch {epoch+1} (acc: {accuracy:.2f}%) will be saved as latest.pth"
+        )
 
     def set_ui_enabled(self, enabled):
         self.train_btn.setEnabled(enabled)
@@ -343,7 +429,10 @@ class TrainingApp(QMainWindow):
     def training_finished(self, success):
         self.set_ui_enabled(True)
         if success:
-            QMessageBox.information(self, "Success", "Training completed successfully!")
+            message = "Training completed successfully!\n"
+            message += f"Best model (acc: {self.thread.best_accuracy:.2f}% at epoch {self.thread.best_epoch+1}) "
+            message += "has been saved as latest.pth and in timestamped directory."
+            QMessageBox.information(self, "Success", message)
         else:
             QMessageBox.warning(
                 self, "Error", "Training failed. Check console for details."

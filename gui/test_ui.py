@@ -19,6 +19,7 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QButtonGroup,
     QProgressBar,
+    QComboBox,
 )
 from PyQt5.QtCore import QThread, pyqtSignal, QObject
 
@@ -134,10 +135,19 @@ class TestApp(QMainWindow):
         data_group.setMinimumWidth(600)
         data_layout = QVBoxLayout()
         data_layout.setSpacing(10)
-        data_layout.addWidget(QLabel("<b>Data Settings</b>"))
+        data_layout.addWidget(QLabel("<b>Dataset Settings</b>"))
+
+        # Add dataset selection dropdown
+        self.dataset_combo = QComboBox()
+        data_layout.addWidget(QLabel("Dataset:"))
+        data_layout.addWidget(self.dataset_combo)
+
+        # Add dataset description label
+        self.dataset_desc_label = QLabel("")
+        data_layout.addWidget(self.dataset_desc_label)
 
         self.data_root_edit = QLineEdit()
-        data_layout.addWidget(QLabel("Data Root:"))
+        data_layout.addWidget(QLabel("Data Directory:"))
         data_layout.addWidget(self.data_root_edit)
         browse_data_btn = QPushButton("Browse...")
         browse_data_btn.clicked.connect(self.browse_data_dir)
@@ -150,6 +160,11 @@ class TestApp(QMainWindow):
         model_group = QWidget()
         model_layout = QVBoxLayout()
         model_layout.addWidget(QLabel("<b>Model Settings</b>"))
+
+        # Add model type selection
+        self.model_combo = QComboBox()
+        model_layout.addWidget(QLabel("Model Type:"))
+        model_layout.addWidget(self.model_combo)
 
         self.num_classes_spin = QSpinBox()
         self.num_classes_spin.setRange(1, 1000)
@@ -215,28 +230,126 @@ class TestApp(QMainWindow):
         self.central_widget.setLayout(layout)
 
     def load_default_values(self):
+        # Set values from config file
         cfg = self.default_config
-        self.data_root_edit.setText(cfg.get("data_root", "./data"))
-        self.num_classes_spin.setValue(cfg.get("num_classes", 10))
-        self.batch_size_spin.setValue(cfg["test"].get("batch_size", 64))
-        self.ckpt_path_edit.setText(cfg["test"].get("ckpt_path", "./ckpts/model.pth"))
 
+        # Load dataset list
+        self.dataset_combo.clear()
+        datasets = self.default_config.get("datasets", {})
+        if datasets:
+            self.dataset_combo.addItems(list(datasets.keys()))
+            # Set current selected dataset
+            selected_dataset = self.default_config.get(
+                "selected_dataset", "cifar10")
+            index = self.dataset_combo.findText(selected_dataset)
+            if index >= 0:
+                self.dataset_combo.setCurrentIndex(index)
+                # Show dataset description
+                if selected_dataset in datasets:
+                    self.dataset_desc_label.setText(
+                        datasets[selected_dataset].get("description", ""))
+
+            # Connect dataset change signal
+            self.dataset_combo.currentTextChanged.connect(
+                self.on_dataset_changed)
+
+            # Set data directory
+            if selected_dataset in datasets:
+                self.data_root_edit.setText(
+                    datasets[selected_dataset].get("path", "./data"))
+                # Set number of classes
+                self.num_classes_spin.setValue(
+                    datasets[selected_dataset].get("num_classes", 10))
+        else:
+            self.data_root_edit.setText(cfg.get("data_root", "./data"))
+            self.num_classes_spin.setValue(cfg.get("num_classes", 10))
+
+        # Load model types
+        self.model_combo.clear()
+        self.model_combo.addItems(self.default_config.get(
+            "model_types", ["attention_cnn"]))
+
+        # Set selected model
+        selected_model = self.default_config.get(
+            "selected_model", "attention_cnn")
+        index = self.model_combo.findText(selected_model)
+        if index >= 0:
+            self.model_combo.setCurrentIndex(index)
+
+        # Connect model change signal
+        self.model_combo.currentTextChanged.connect(self.on_model_changed)
+
+        self.batch_size_spin.setValue(cfg["test"].get("batch_size", 64))
+
+        # Set checkpoint path
+        self.update_checkpoint_path()
+
+        # Set device radio button
         device = cfg.get("device", "cuda").lower()
         if device == torch.device("cpu") or not torch.cuda.is_available():
             self.device_cpu.setChecked(True)
         else:
             self.device_gpu.setChecked(True)
 
+    def on_dataset_changed(self, dataset_name):
+        """Handle dataset selection change"""
+        datasets = self.default_config.get("datasets", {})
+        if dataset_name in datasets:
+            dataset_config = datasets[dataset_name]
+            # Update data directory
+            self.data_root_edit.setText(dataset_config.get("path", "./data"))
+            # Update number of classes
+            self.num_classes_spin.setValue(
+                dataset_config.get("num_classes", 10))
+            # Update description
+            self.dataset_desc_label.setText(
+                dataset_config.get("description", ""))
+            # Update checkpoint path
+            self.update_checkpoint_path()
+
+    def on_model_changed(self, model_name):
+        """Handle model type selection change"""
+        # Update checkpoint path when model changes
+        self.update_checkpoint_path()
+
+    def update_checkpoint_path(self):
+        """Update checkpoint path based on dataset and model selections"""
+        dataset = self.dataset_combo.currentText()
+        model = self.model_combo.currentText()
+
+        if dataset and model:
+            # Set path to latest model for the selected dataset and model
+            ckpt_path = os.path.join(
+                self.default_config["train"]["output_dir"],
+                dataset,
+                model,
+                "latest.pth"
+            )
+            # 将反斜杠替换为正斜杠以保持一致性
+            ckpt_path = ckpt_path.replace("\\", "/")
+            self.ckpt_path_edit.setText(ckpt_path)
+
     def browse_data_dir(self):
-        dir_path = QFileDialog.getExistingDirectory(self, "Select Data Directory")
+        dir_path = QFileDialog.getExistingDirectory(
+            self, "Select Data Directory")
         if dir_path:
             self.data_root_edit.setText(dir_path)
 
     def browse_ckpt_file(self):
+        # Start in the directory for the currently selected dataset/model
+        dataset = self.dataset_combo.currentText()
+        model = self.model_combo.currentText()
+        start_dir = os.path.join(
+            "./ckpts", dataset, model) if dataset and model else "./ckpts"
+        # 将反斜杠替换为正斜杠以保持一致性
+        start_dir = start_dir.replace("\\", "/")
+
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Select Checkpoint File", "./ckpts", "Model Files (*.pth *.pt)"
+            self, "Select Checkpoint File", start_dir, "Model Files (*.pth *.pt)"
         )
         if file_path:
+            # 将反斜杠替换为正斜杠以保持一致性
+            file_path = file_path.replace("\\", "/")
             self.ckpt_path_edit.setText(file_path)
 
     def cancel_testing(self):
@@ -255,30 +368,19 @@ class TestApp(QMainWindow):
                 self.set_ui_enabled(True)
 
     def start_testing(self):
+        # Get current selected dataset and model
+        selected_dataset = self.dataset_combo.currentText()
+        selected_model = self.model_combo.currentText()
+
+        # 获取检查点路径并统一斜杠
         ckpt_path = os.path.abspath(self.ckpt_path_edit.text())
-        model_types = self.default_config.get("model_types", ["attention_cnn"])
+        ckpt_path = ckpt_path.replace("\\", "/")
 
-        # Find model type that matches checkpoint path
-        selected_model = None
-        for model in model_types:
-            if model.lower() in ckpt_path.lower():
-                selected_model = model
-                break
-
-        if not selected_model:
-            QMessageBox.warning(
-                self,
-                "Error",
-                "Could not determine model type from checkpoint path.\n"
-                f"Path should contain one of: {', '.join(model_types)}",
-            )
-            return
-
+        # Create config dictionary
         config_dict = {
             "device": "cuda" if self.device_gpu.isChecked() else "cpu",
-            "data_root": os.path.abspath(self.data_root_edit.text()),
-            "num_classes": self.num_classes_spin.value(),
-            "model_types": model_types,
+            "datasets": self.default_config.get("datasets", {}),
+            "selected_dataset": selected_dataset,
             "selected_model": selected_model,
             "test": {
                 "batch_size": self.batch_size_spin.value(),
@@ -300,7 +402,7 @@ class TestApp(QMainWindow):
         self.thread = TestThread(config, self.testing_controller)
         self.thread.finished.connect(self.testing_finished)
         self.thread.progress_update.connect(self.update_progress)
-        self.thread.accuracy_update.connect(self.update_accuracy)  # Add this line
+        self.thread.accuracy_update.connect(self.update_accuracy)
         self.thread.start()
 
     def update_progress(self, current, total):
@@ -321,7 +423,8 @@ class TestApp(QMainWindow):
     def testing_finished(self, success):
         self.set_ui_enabled(True)
         if success:
-            QMessageBox.information(self, "Success", "Testing completed successfully!")
+            QMessageBox.information(
+                self, "Success", "Testing completed successfully!")
         else:
             QMessageBox.warning(
                 self, "Error", "Testing failed. Check console for details."
