@@ -21,65 +21,69 @@ def main(
     device = cfg.device
     # Use the selected dataset from config
     dataloader = get_dataloader(
-        cfg.data_root, 
-        cfg.training_config["batch_size"], 
+        cfg.data_root,
+        cfg.training_config["batch_size"],
         dataset_name=cfg.selected_dataset,
         train=True
     )
 
+    # Select model
     if cfg.selected_model == "attention_cnn":
         model = AttentionCNN(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet18":
-        model = ResNet18(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet34":
-        model = ResNet34(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet50":
-        model = ResNet50(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet101":
-        model = ResNet101(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet152":
-        model = ResNet152(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet20":
-        model = ResNet20(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet32":
-        model = ResNet32(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet44":
-        model = ResNet44(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet56":
-        model = ResNet56(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet110":
-        model = ResNet110(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet1202":
-        model = ResNet1202(num_classes=cfg.num_classes).to(device)
+    # Handle all ResNet variants
+    elif cfg.selected_model.startswith("resnet"):
+        # Create the appropriate ResNet variant based on selected model
+        if cfg.selected_model == "resnet18":
+            model = ResNet18(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet34":
+            model = ResNet34(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet50":
+            model = ResNet50(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet101":
+            model = ResNet101(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet152":
+            model = ResNet152(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet20":
+            model = ResNet20(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet32":
+            model = ResNet32(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet44":
+            model = ResNet44(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet56":
+            model = ResNet56(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet110":
+            model = ResNet110(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet1202":
+            model = ResNet1202(num_classes=cfg.num_classes).to(device)
+        else:
+            raise ValueError(f"Unknown ResNet variant: {cfg.selected_model}")
     elif cfg.selected_model == "Autoencoder":
         model = Autoencoder(num_classes=cfg.num_classes).to(device)
         
-        # 检查是否启用预训练
+        # Check if pretraining is enabled
         if cfg.training_config.get("use_pretrain", True):
-            # 添加自编码器预训练阶段
+            # Add autoencoder pretraining phase
             pretrain_epochs = cfg.training_config.get("pretrain_epochs", 5) 
             pretrain_lr = cfg.training_config.get("pretrain_lr", 0.001)
             
             print(f"Starting autoencoder pre-training ({pretrain_epochs} epochs)...")
             pretrain_optimizer = torch.optim.Adam(model.parameters(), lr=pretrain_lr)
             
-            # 计算预训练总迭代次数
+            # Calculate total pretraining iterations
             pretrain_iterations = pretrain_epochs * len(dataloader)
             
-            # 调用自编码器训练方法，传入进度回调
+            # Call autoencoder training method with progress callback
             model.train_autoencoder(
                 dataloader=dataloader,
                 optimizer=pretrain_optimizer,
                 epochs=pretrain_epochs,
                 device=device,
                 progress_callback=progress_callback,
-                total_iterations=pretrain_iterations
+                total_iterations=pretrain_iterations,
+                controller=controller
             )
-            
-            print(f"Autoencoder pre-training completed after {pretrain_epochs} epochs")
-        print("Starting classification training phase...")
     else:
-        raise ValueError("Unsupported model type.")
+        raise ValueError(f"Unknown model type: {cfg.selected_model}")
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(
@@ -89,15 +93,29 @@ def main(
     total_iterations = n_epochs * len(dataloader)
 
     # Create output directory with hierarchical structure: dataset/model_type
-    output_base = os.path.join(
-        cfg.training_config["output_dir"],
-        cfg.selected_dataset,   # First level: dataset name
-        cfg.selected_model      # Second level: model type
-    )
+    # Check if the output_dir already contains dataset and model name 
+    # to avoid duplicate nesting
+    output_dir = cfg.training_config["output_dir"]
+    output_path_parts = output_dir.replace("\\", "/").split("/")
+    
+    # If the output directory already has the dataset and model as last components, use it directly
+    if (len(output_path_parts) >= 2 and 
+        output_path_parts[-2] == cfg.selected_dataset and 
+        output_path_parts[-1] == cfg.selected_model):
+        output_base = output_dir
+    else:
+        # Create hierarchical path with dataset and model type
+        output_base = os.path.join(
+            output_dir,
+            cfg.selected_dataset,   # First level: dataset name
+            cfg.selected_model      # Second level: model type
+        )
+        
     os.makedirs(output_base, exist_ok=True)
 
     # Early stopping parameters
-    patience = cfg.training_config.get("early_stopping_patience", 10)  # Get from config or use default
+    # Get from config or use default
+    patience = cfg.training_config.get("early_stopping_patience", 10)
     wait = 0       # Counter for patience
     best_acc = 0.0
     best_epoch = 0
@@ -141,32 +159,36 @@ def main(
         print(
             f"Epoch {epoch+1}/{n_epochs} Loss: {epoch_loss:.3f} Acc: {epoch_acc:.2%} Time: {toc-tic:.1f}s"
         )
-        
+
         # Check if this is the best model so far
         if epoch_acc > best_acc:
             best_acc = epoch_acc
             best_epoch = epoch
             best_state_dict = model.state_dict().copy()
-            
+
             # No need to save best.pth, we'll save it at the end
-            print(f"Found new best model with accuracy: {best_acc:.4f} at epoch {epoch+1}")
-            
+            print(
+                f"Found new best model with accuracy: {best_acc:.4f} at epoch {epoch+1}")
+
             # Reset patience counter
             wait = 0
         else:
             # Increment patience counter
             wait += 1
-            print(f"No improvement for {wait} epochs. Best accuracy: {best_acc:.4f} at epoch {best_epoch+1}")
-            
+            print(
+                f"No improvement for {wait} epochs. Best accuracy: {best_acc:.4f} at epoch {best_epoch+1}")
+
             # Check if we should stop early
             if wait >= patience:
-                print(f"Early stopping at epoch {epoch+1}. No improvement for {patience} epochs.")
+                print(
+                    f"Early stopping at epoch {epoch+1}. No improvement for {patience} epochs.")
                 break
 
     # If we have a best model (which we should), load it back
     if best_state_dict is not None:
         model.load_state_dict(best_state_dict)
-        print(f"Loaded best model from epoch {best_epoch+1} with accuracy {best_acc:.4f}")
+        print(
+            f"Loaded best model from epoch {best_epoch+1} with accuracy {best_acc:.4f}")
 
     # Save the best model in a timestamped directory
     curr_time = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -174,12 +196,12 @@ def main(
     os.makedirs(save_dir, exist_ok=True)
     torch.save(best_state_dict, os.path.join(save_dir, "model.pth"))
     print(f"Saved best model to {save_dir}/model.pth")
-    
+
     # Also save a copy with standard name for easy testing
     standard_path = os.path.join(output_base, "latest.pth")
     torch.save(best_state_dict, standard_path)
     print(f"Saved copy of best model to {standard_path}")
-    
+
     # Always ensure we return the best model
     return model, best_acc, best_epoch
 

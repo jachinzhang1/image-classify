@@ -6,116 +6,137 @@ from sklearn.neighbors import KNeighborsClassifier
 
 
 class Encoder(nn.Module):
-    def __init__(self, in_channels=3):
-        super(Encoder, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(64)
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-        self.bn3 = nn.BatchNorm2d(128)
-        self.pool = nn.MaxPool2d(2, 2)
-        
+    def __init__(self):
+        super().__init__()
+        # Input: [B, 3, 32, 32]
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1)
+        # Output: [B, 32, 32, 32]
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1)
+        # Output: [B, 64, 16, 16]
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1)
+        # Output: [B, 128, 8, 8]
+        self.pool = nn.AdaptiveAvgPool2d((4, 4))
+        # Output: [B, 128, 4, 4]
+        self.flatten = nn.Flatten()
+        # Output: [B, 128*4*4]
+        self.fc = nn.Linear(128 * 4 * 4, 512)
+        # Output: [B, 512]
+
     def forward(self, x):
-        x = self.pool(F.relu(self.bn1(self.conv1(x))))  # 32 x 16 x 16
-        x = self.pool(F.relu(self.bn2(self.conv2(x))))  # 64 x 8 x 8
-        x = self.pool(F.relu(self.bn3(self.conv3(x))))  # 128 x 4 x 4
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
+        x = self.pool(x)
+        x = self.flatten(x)
+        x = self.fc(x)
         return x
 
 
 class Decoder(nn.Module):
-    def __init__(self, out_channels=3):
-        super(Decoder, self).__init__()
-        self.upconv1 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
-        self.bn1 = nn.BatchNorm2d(64)
-        self.upconv2 = nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2)
-        self.bn2 = nn.BatchNorm2d(32)
-        self.upconv3 = nn.ConvTranspose2d(32, 16, kernel_size=2, stride=2)
-        self.bn3 = nn.BatchNorm2d(16)
-        self.conv_out = nn.Conv2d(16, out_channels, kernel_size=3, padding=1)
-        
+    def __init__(self):
+        super().__init__()
+        # Input: [B, 512]
+        self.fc = nn.Linear(512, 128 * 4 * 4)
+        # Output: [B, 128*4*4]
+        self.unflatten = nn.Unflatten(1, (128, 4, 4))
+        # Output: [B, 128, 4, 4]
+        self.deconv1 = nn.ConvTranspose2d(
+            128, 64, kernel_size=4, stride=2, padding=1)
+        # Output: [B, 64, 8, 8]
+        self.deconv2 = nn.ConvTranspose2d(
+            64, 32, kernel_size=4, stride=2, padding=1)
+        # Output: [B, 32, 16, 16]
+        self.deconv3 = nn.ConvTranspose2d(
+            32, 16, kernel_size=4, stride=2, padding=1)
+        # Output: [B, 16, 32, 32]
+        self.deconv4 = nn.Conv2d(16, 3, kernel_size=3, stride=1, padding=1)
+        # Output: [B, 3, 32, 32]
+
     def forward(self, x):
-        x = F.relu(self.bn1(self.upconv1(x)))  # 64 x 8 x 8
-        x = F.relu(self.bn2(self.upconv2(x)))  # 32 x 16 x 16
-        x = F.relu(self.bn3(self.upconv3(x)))  # 16 x 32 x 32
-        x = torch.sigmoid(self.conv_out(x))     # 3 x 32 x 32
+        x = F.relu(self.fc(x))
+        x = self.unflatten(x)
+        x = F.relu(self.deconv1(x))
+        x = F.relu(self.deconv2(x))
+        x = F.relu(self.deconv3(x))
+        x = torch.sigmoid(self.deconv4(x))
         return x
 
 
 class Autoencoder(nn.Module):
-    def __init__(self, num_classes=10, n_neighbors=5, embedding_dim=128):
-        super(Autoencoder, self).__init__()
+    def __init__(self, num_classes=10):
+        super().__init__()
         self.encoder = Encoder()
         self.decoder = Decoder()
         
-        # Feature embedding
-        self.embedding = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(128 * 4 * 4, 512),
+        # Classification layers
+        self.classifier = nn.Sequential(
+            nn.Linear(512, 256),
             nn.ReLU(),
-            nn.Linear(512, embedding_dim)
+            nn.Dropout(0.5),
+            nn.Linear(256, num_classes)
         )
         
-        # 分类头 - 用于标准训练流程
-        self.classifier = nn.Linear(embedding_dim, num_classes)
+    def encoder_decoder(self, x):
+        # Autoencoder path - returns reconstructed image
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        return decoded
         
-        
-    def encode(self, x): 
-        """编码器部分，提取特征嵌入"""
-        features = self.encoder(x)
-        embedding = self.embedding(features)
-        return embedding, features
-    
     def forward(self, x):
-        """默认forward返回分类logits，兼容CrossEntropyLoss"""
-        embedding, _ = self.encode(x)
-        return self.classifier(embedding)  # 返回分类结果
-
-    def get_reconstruction(self, x):
-        """获取重建图像"""
-        _, features = self.encode(x)
-        return self.decoder(features)
-        
-
-
-    def train_autoencoder(self, dataloader, optimizer=None, epochs=10, device='cuda', 
-                          progress_callback=None, total_iterations=None):
-        """独立训练自编码器部分，支持进度报告"""
-        if optimizer is None:
-            optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
-        
-        criterion = nn.MSELoss()
+        # Classification path - returns class logits
+        encoded = self.encoder(x)
+        return self.classifier(encoded)
+    
+    def train_autoencoder(
+        self, 
+        dataloader, 
+        optimizer, 
+        epochs, 
+        device, 
+        progress_callback=None,
+        total_iterations=None,
+        controller=None
+    ):
+        """Pre-train the autoencoder part"""
         self.train()
         
-        # 计算总迭代次数用于进度报告
-        if total_iterations is None:
-            total_iterations = epochs * len(dataloader)
+        # Use MSE loss for image reconstruction
+        criterion = nn.MSELoss()
         
+        current_iter = 0
         for epoch in range(epochs):
             total_loss = 0
-            for i, (images, _) in enumerate(dataloader):
-                images = images.to(device)
+            batch_count = 0
+            
+            for batch_idx, (data, _) in enumerate(dataloader):
+                data = data.to(device)
                 
-                # 前向传播
-                _, features = self.encode(images)
-                reconstructed = self.decoder(features)
+                # Check if training should be stopped
+                if controller and controller.should_stop:
+                    print("Autoencoder pre-training cancelled")
+                    return
                 
-                # 计算重建损失
-                loss = criterion(reconstructed, images)
+                # Forward pass
+                reconstructed = self.encoder_decoder(data)
+                loss = criterion(reconstructed, data)
                 
-                # 反向传播与优化
+                # Backward pass and optimization
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
                 
                 total_loss += loss.item()
+                batch_count += 1
+                current_iter += 1
                 
-                # 进度报告
-                if progress_callback:
-                    current_iter = epoch * len(dataloader) + i + 1
-                    progress_callback.emit(current_iter, total_iterations, -epoch-1)  # 使用负数epoch表示预训练阶段
-                    
-            avg_loss = total_loss / len(dataloader)
-            print(f'Pretrain Epoch [{epoch+1}/{epochs}], Reconstruction Loss: {avg_loss:.4f}')
+                # Update progress
+                if progress_callback and total_iterations:
+                    progress_callback.emit(current_iter, total_iterations, -epoch-1)  # Negative epoch to indicate pre-training
+            
+            # Print average loss after each epoch
+            avg_loss = total_loss / batch_count
+            print(f"Autoencoder Epoch {epoch+1}/{epochs}, Avg Loss: {avg_loss:.6f}")
+        
+        print(f"Autoencoder pre-training completed after {epochs} epochs")
 
 

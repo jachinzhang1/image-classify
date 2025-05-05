@@ -216,6 +216,16 @@ class TrainingApp(QMainWindow):
         model_layout.addWidget(QLabel("Model Type:"))
         model_layout.addWidget(self.model_combo)
 
+        # 添加ResNet变体选择下拉框
+        self.resnet_variant_group = QWidget()
+        resnet_variant_layout = QVBoxLayout()
+        resnet_variant_layout.addWidget(QLabel("ResNet Variant:"))
+        self.resnet_variant_combo = QComboBox()
+        resnet_variant_layout.addWidget(self.resnet_variant_combo)
+        self.resnet_variant_group.setLayout(resnet_variant_layout)
+        self.resnet_variant_group.setVisible(False)  # Default hidden
+        model_layout.addWidget(self.resnet_variant_group)
+
         self.num_classes_spin = QSpinBox()
         self.num_classes_spin.setRange(1, 1000)
         model_layout.addWidget(QLabel("Number of Classes:"))
@@ -231,7 +241,8 @@ class TrainingApp(QMainWindow):
         pretrain_layout.addWidget(QLabel("<b>Autoencoder Pretraining</b>"))
 
         # 添加是否启用预训练的复选框
-        self.enable_pretrain_check = QCheckBox("Enable autoencoder pretraining")
+        self.enable_pretrain_check = QCheckBox(
+            "Enable autoencoder pretraining")
         self.enable_pretrain_check.setChecked(True)
         pretrain_layout.addWidget(self.enable_pretrain_check)
 
@@ -252,11 +263,15 @@ class TrainingApp(QMainWindow):
         pretrain_layout.addWidget(self.pretrain_lr_spin)
 
         self.pretrain_group.setLayout(pretrain_layout)
-        self.pretrain_group.setVisible(False)  # 默认隐藏
+        self.pretrain_group.setVisible(False)  # Default hidden
         layout.addWidget(self.pretrain_group)
 
         # 连接模型选择变化事件
         self.model_combo.currentTextChanged.connect(self.on_model_changed)
+
+        # 连接ResNet变体更改信号
+        self.resnet_variant_combo.currentTextChanged.connect(
+            self.on_resnet_variant_changed)
 
         # Device selection - modified to use QRadioButton
         device_group = QWidget()
@@ -357,6 +372,29 @@ class TrainingApp(QMainWindow):
         if index >= 0:
             self.model_combo.setCurrentIndex(index)
 
+        # 加载ResNet变体
+        self.resnet_variant_combo.clear()
+        self.resnet_variant_combo.addItems(
+            self.default_config.get("resnet_variants", ["resnet18"])
+        )
+
+        # 设置选择的ResNet变体
+        selected_variant = self.default_config.get(
+            "selected_resnet_variant", "resnet18")
+        index = self.resnet_variant_combo.findText(selected_variant)
+        if index >= 0:
+            self.resnet_variant_combo.setCurrentIndex(index)
+
+        # 连接模型更改信号
+        self.model_combo.currentTextChanged.connect(self.on_model_changed)
+
+        # 连接ResNet变体更改信号
+        self.resnet_variant_combo.currentTextChanged.connect(
+            self.on_resnet_variant_changed)
+
+        # 根据当前选择的模型显示或隐藏ResNet变体选择
+        self.update_resnet_variant_visibility(selected_model)
+
     def browse_data_dir(self):
         dir_path = QFileDialog.getExistingDirectory(
             self, "Select Data Directory")
@@ -397,61 +435,126 @@ class TrainingApp(QMainWindow):
             # Update description
             self.dataset_desc_label.setText(
                 dataset_config.get("description", ""))
+            # Update output directory path
+            self.update_output_dir_path()
 
     def on_model_changed(self, model_name):
-        """处理模型类型变更"""
-        # 根据是否为Autoencoder模型显示或隐藏预训练配置
+        """Handle model selection change"""
+        # Update ResNet variant selection visibility
+        self.update_resnet_variant_visibility(model_name)
+
+        # Show pretraining settings only if Autoencoder is selected
         self.pretrain_group.setVisible(model_name == "Autoencoder")
+
+        # Update output directory path
+        self.update_output_dir_path()
+
+    def on_resnet_variant_changed(self, variant_name):
+        """Handle ResNet variant selection change"""
+        # No need to update visibility, just update configs for checkpoint path
+        selected_model = self.model_combo.currentText()
+        if selected_model == "resnet":
+            # Update output directory path according to the selected variant
+            self.update_output_dir_path()
+
+    def update_resnet_variant_visibility(self, model_name):
+        """Show or hide ResNet variant selection based on model type"""
+        self.resnet_variant_group.setVisible(model_name == "resnet")
+
+    def update_output_dir_path(self):
+        """Update output directory based on current selections"""
+        # This is primarily for showing the expected output path, the actual path
+        # is determined during training start based on current selections
+        dataset = self.dataset_combo.currentText()
+        model = self.model_combo.currentText()
+
+        # Get the actual model name for the output path
+        if model == "resnet":
+            model = self.resnet_variant_combo.currentText()
+
+        # Get the base directory from config
+        base_dir = self.default_config["train"].get("output_dir", "./ckpts")
+
+        # Set the output path to include dataset and model
+        output_path = f"{base_dir}/{dataset}/{model}"
+
+        # Update UI
+        self.output_dir_edit.setText(output_path)
 
     def start_training(self):
         # Create config dictionary
-        selected_dataset = self.dataset_combo.currentText()
+        try:
+            selected_dataset = self.dataset_combo.currentText()
+            selected_model = self.model_combo.currentText()
 
-        config_dict = {
-            "device": "cuda" if self.device_gpu.isChecked() else "cpu",
-            "datasets": self.default_config.get("datasets", {}),
-            "selected_dataset": selected_dataset,
-            "model_types": self.default_config.get("model_types", ["attention_cnn"]),
-            "selected_model": self.model_combo.currentText(),
-            "train": {
-                "n_epochs": self.epochs_spin.value(),
-                "batch_size": self.batch_size_spin.value(),
-                "lr": float(self.lr_spin.value()),
-                "early_stopping_patience": self.patience_spin.value(),
-                "output_dir": os.path.abspath(self.output_dir_edit.text()),
-                # 添加预训练配置
-                "use_pretrain": self.enable_pretrain_check.isChecked() if hasattr(self, 'enable_pretrain_check') else True,
-                "pretrain_epochs": self.pretrain_epochs_spin.value() if hasattr(self, 'pretrain_epochs_spin') else 5,
-                "pretrain_lr": float(self.pretrain_lr_spin.value()) if hasattr(self, 'pretrain_lr_spin') else 0.001,
-            },
-        }
+            # Get the actual model name to use
+            actual_model = selected_model
+            if selected_model == "resnet":
+                actual_model = self.resnet_variant_combo.currentText()
 
-        # Save config to temporary file
-        config_path = "temp_train_config.yaml"
-        with open(config_path, "w") as f:
-            yaml.dump(config_dict, f)
+            # Set device
+            if self.device_cpu.isChecked():
+                device = torch.device("cpu")
+            else:
+                device = torch.device(
+                    "cuda" if torch.cuda.is_available() else "cpu")
 
-        # Create Configs object
-        config = Configs(config_path=config_path)
+            # Create training configuration dictionary
+            config_dict = {
+                "device": "cuda" if self.device_gpu.isChecked() else "cpu",
+                "data_root": self.data_root_edit.text(),
+                "num_classes": self.num_classes_spin.value(),
+                "selected_dataset": selected_dataset,
+                "selected_model": actual_model,
+                "train": {
+                    "n_epochs": self.epochs_spin.value(),
+                    "batch_size": self.batch_size_spin.value(),
+                    "lr": float(self.lr_spin.value()),
+                    "early_stopping_patience": self.patience_spin.value(),
+                    "output_dir": os.path.abspath(self.output_dir_edit.text()),
+                }
+            }
 
-        # Disable UI during training
-        self.set_ui_enabled(False)
-        self.progress_bar.setStyleSheet(self.normal_style)
-        self.progress_label.setText("Training started...")
+            # Add pretraining configuration if Autoencoder is selected
+            if selected_model == "Autoencoder":
+                config_dict["train"].update({
+                    "use_pretrain": self.enable_pretrain_check.isChecked() if hasattr(self, 'enable_pretrain_check') else True,
+                    "pretrain_epochs": self.pretrain_epochs_spin.value() if hasattr(self, 'pretrain_epochs_spin') else 5,
+                    "pretrain_lr": float(self.pretrain_lr_spin.value()) if hasattr(self, 'pretrain_lr_spin') else 0.001,
+                })
 
-        # Start training thread
-        self.training_controller = TrainingController()
-        self.thread = TrainingThread(config, self.training_controller)
-        self.thread.finished.connect(self.training_finished)
-        self.thread.terminated.connect(lambda: self.set_ui_enabled(True))
-        self.thread.progress_update.connect(self.update_progress)
-        self.thread.best_model_update.connect(self.update_best_model)
-        self.thread.start()
+            # Save configuration to temporary file
+            config_path = "temp_train_config.yaml"
+            with open(config_path, "w") as f:
+                yaml.dump(config_dict, f)
+
+            # Create Configs object
+            config = Configs(config_path=config_path)
+
+            # Disable UI during training
+            self.set_ui_enabled(False)
+
+            # Create training controller and thread
+            self.training_controller = TrainingController()
+            self.thread = TrainingThread(config, self.training_controller)
+
+            # Connect signals
+            self.thread.finished.connect(self.training_finished)
+            self.thread.terminated.connect(lambda: self.set_ui_enabled(True))
+            self.thread.progress_update.connect(self.update_progress)
+            self.thread.best_model_update.connect(self.update_best_model)
+            self.thread.start()
+        except Exception as e:
+            print(f"Training error: {e}")
+            self.set_ui_enabled(True)
+            QMessageBox.warning(
+                self, "Error", "Training failed. Check console for details."
+            )
 
     def update_progress(self, current, total, epoch):
         progress = int((current / total) * 100) if total > 0 else 0
         self.progress_bar.setValue(progress)
-        
+
         # 根据epoch值判断是预训练还是分类训练
         if epoch < 0:  # 负值表示预训练阶段
             pretrain_epoch = -epoch

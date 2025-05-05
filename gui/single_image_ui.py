@@ -79,6 +79,16 @@ class SingleImageApp(QMainWindow):
         model_layout.addWidget(QLabel("Model Type:"))
         model_layout.addWidget(self.model_combo)
 
+        # 添加ResNet变体选择下拉框
+        self.resnet_variant_group = QWidget()
+        resnet_variant_layout = QVBoxLayout()
+        resnet_variant_layout.addWidget(QLabel("ResNet Variant:"))
+        self.resnet_variant_combo = QComboBox()
+        resnet_variant_layout.addWidget(self.resnet_variant_combo)
+        self.resnet_variant_group.setLayout(resnet_variant_layout)
+        self.resnet_variant_group.setVisible(False)  # Default hidden
+        model_layout.addWidget(self.resnet_variant_group)
+
         self.ckpt_path_edit = QLineEdit()
         model_layout.addWidget(QLabel("Checkpoint Path:"))
         model_layout.addWidget(self.ckpt_path_edit)
@@ -156,8 +166,24 @@ class SingleImageApp(QMainWindow):
         if index >= 0:
             self.model_combo.setCurrentIndex(index)
 
+        # 加载ResNet变体
+        self.resnet_variant_combo.clear()
+        self.resnet_variant_combo.addItems(self.config.resnet_variants)
+
+        # 设置选择的ResNet变体
+        selected_variant = self.config.selected_resnet_variant
+        index = self.resnet_variant_combo.findText(selected_variant)
+        if index >= 0:
+            self.resnet_variant_combo.setCurrentIndex(index)
+
         # Connect model change signal
         self.model_combo.currentTextChanged.connect(self.on_model_changed)
+
+        # Connect ResNet variant change signal
+        self.resnet_variant_combo.currentTextChanged.connect(self.on_resnet_variant_changed)
+
+        # 根据当前选择的模型显示或隐藏ResNet变体选择
+        self.update_resnet_variant_visibility(selected_model)
 
         # Update the checkpoint path
         self.update_checkpoint_path()
@@ -176,28 +202,43 @@ class SingleImageApp(QMainWindow):
 
     def on_model_changed(self, model_name):
         """Handle model type selection change"""
-        # Update selected model in config
-        self.config.selected_model = model_name
+        # Update ResNet variant selection visibility
+        self.update_resnet_variant_visibility(model_name)
         # Update checkpoint path
         self.update_checkpoint_path()
+        # Clear previous results
+        self.clear_result()
+
+    def on_resnet_variant_changed(self, variant_name):
+        """Handle ResNet variant selection change"""
+        selected_model = self.model_combo.currentText()
+        if selected_model == "resnet":
+            # Update checkpoint path based on the selected variant
+            self.update_checkpoint_path()
+            # Clear previous results
+            self.clear_result()
+
+    def update_resnet_variant_visibility(self, model_name):
+        """Show or hide ResNet variant selection based on model type"""
+        self.resnet_variant_group.setVisible(model_name == "resnet")
 
     def update_checkpoint_path(self):
-        """Update checkpoint path based on dataset and model selections"""
+        """Update checkpoint path based on selected dataset and model"""
         dataset = self.dataset_combo.currentText()
         model = self.model_combo.currentText()
 
-        if dataset and model:
-            # Set path to latest model for the selected dataset and model
-            ckpt_path = os.path.join(
-                self.config.training_config["output_dir"],
-                dataset,
-                model,
-                "latest.pth"
-            )
-            # 将反斜杠替换为正斜杠以保持一致性
-            ckpt_path = ckpt_path.replace("\\", "/")
-            self.ckpt_path_edit.setText(ckpt_path)
-            self.update_status()
+        # Get the actual model name to use
+        actual_model = model
+        if model == "resnet":
+            actual_model = self.resnet_variant_combo.currentText()
+
+        # For autoencoder, we need to handle the checkpoint path differently
+        if model == "Autoencoder":
+            actual_model = "autoencoder"
+
+        ckpt_path = f"./ckpts/{dataset}/{actual_model}/latest.pth"
+        self.ckpt_path_edit.setText(ckpt_path)
+        self.update_status()
 
     def browse_ckpt_file(self):
         # Start in the directory for the currently selected dataset/model
@@ -242,30 +283,41 @@ class SingleImageApp(QMainWindow):
             self.status_label.setStyleSheet("color: red")
 
     def start_testing(self):
-        if not (self.ckpt_path_edit.text() and self.image_path_edit.text()):
-            self.status_label.setText(
-                "Please complete model and image selection first!"
-            )
-            self.status_label.setStyleSheet("color: red")
-            return
-
-        # Update current selected dataset
-        selected_dataset = self.dataset_combo.currentText()
-        if selected_dataset in self.config.datasets:
-            self.config.update_dataset(selected_dataset)
-
-        # 获取检查点路径并统一斜杠
-        ckpt_path = os.path.abspath(self.ckpt_path_edit.text())
-        ckpt_path = ckpt_path.replace("\\", "/")
-
-        # 获取图像路径并统一斜杠
-        image_path = self.image_path_edit.text()
-        image_path = image_path.replace("\\", "/")
-
-        # Update config
-        self.config.test_config["ckpt_path"] = ckpt_path
-
+        """Start testing a single image"""
         try:
+            # Check if image is selected
+            image_path = self.image_path_edit.text()
+            if not image_path or not os.path.isfile(image_path):
+                self.status_label.setText("Please select a valid image file")
+                return
+                
+            # Get selected model type
+            selected_model = self.model_combo.currentText()
+            
+            # Get the actual model name to use
+            actual_model = selected_model
+            if selected_model == "resnet":
+                actual_model = self.resnet_variant_combo.currentText()
+
+            # Update current selected dataset
+            selected_dataset = self.dataset_combo.currentText()
+            if selected_dataset in self.config.datasets:
+                self.config.update_dataset(selected_dataset)
+                
+            # Update selected model in config
+            self.config.selected_model = actual_model
+
+            # Get checkpoint path and standardize slashes
+            ckpt_path = os.path.abspath(self.ckpt_path_edit.text())
+            ckpt_path = ckpt_path.replace("\\", "/")
+
+            # Get image path and standardize slashes
+            image_path = self.image_path_edit.text()
+            image_path = image_path.replace("\\", "/")
+
+            # Update config
+            self.config.test_config["ckpt_path"] = ckpt_path
+
             class_idx = classify_image(
                 self.config, image_path)
             self.result_label.setText(
@@ -273,6 +325,12 @@ class SingleImageApp(QMainWindow):
         except Exception as e:
             QMessageBox.warning(
                 self, "Error", f"Classification failed: {str(e)}")
+
+    def clear_result(self):
+        """Clear previous classification result"""
+        self.result_label.setText("")
+        self.status_label.setText("Please select model and image")
+        self.status_label.setStyleSheet("")
 
 
 if __name__ == "__main__":

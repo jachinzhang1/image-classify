@@ -166,6 +166,16 @@ class TestApp(QMainWindow):
         model_layout.addWidget(QLabel("Model Type:"))
         model_layout.addWidget(self.model_combo)
 
+        # 添加ResNet变体选择下拉框
+        self.resnet_variant_group = QWidget()
+        resnet_variant_layout = QVBoxLayout()
+        resnet_variant_layout.addWidget(QLabel("ResNet Variant:"))
+        self.resnet_variant_combo = QComboBox()
+        resnet_variant_layout.addWidget(self.resnet_variant_combo)
+        self.resnet_variant_group.setLayout(resnet_variant_layout)
+        self.resnet_variant_group.setVisible(False)  # 默认隐藏
+        model_layout.addWidget(self.resnet_variant_group)
+
         self.num_classes_spin = QSpinBox()
         self.num_classes_spin.setRange(1, 1000)
         model_layout.addWidget(QLabel("Number of Classes:"))
@@ -276,8 +286,27 @@ class TestApp(QMainWindow):
         if index >= 0:
             self.model_combo.setCurrentIndex(index)
 
+        # 加载ResNet变体
+        self.resnet_variant_combo.clear()
+        self.resnet_variant_combo.addItems(
+            self.default_config.get("resnet_variants", ["resnet18"])
+        )
+
+        # 设置选择的ResNet变体
+        selected_variant = self.default_config.get(
+            "selected_resnet_variant", "resnet18")
+        index = self.resnet_variant_combo.findText(selected_variant)
+        if index >= 0:
+            self.resnet_variant_combo.setCurrentIndex(index)
+
         # Connect model change signal
         self.model_combo.currentTextChanged.connect(self.on_model_changed)
+        
+        # Connect ResNet variant change signal
+        self.resnet_variant_combo.currentTextChanged.connect(self.on_resnet_variant_changed)
+        
+        # 根据当前选择的模型显示或隐藏ResNet变体选择
+        self.update_resnet_variant_visibility(selected_model)
 
         self.batch_size_spin.setValue(cfg["test"].get("batch_size", 64))
 
@@ -309,25 +338,38 @@ class TestApp(QMainWindow):
 
     def on_model_changed(self, model_name):
         """Handle model type selection change"""
+        # 更新ResNet变体选择框的可见性
+        self.update_resnet_variant_visibility(model_name)
         # Update checkpoint path when model changes
         self.update_checkpoint_path()
 
+    def on_resnet_variant_changed(self, variant_name):
+        """Handle ResNet variant selection change"""
+        selected_model = self.model_combo.currentText()
+        if selected_model == "resnet":
+            # Update checkpoint path based on the selected variant
+            self.update_checkpoint_path()
+
+    def update_resnet_variant_visibility(self, model_name):
+        """根据选择的模型类型显示或隐藏ResNet变体选择"""
+        self.resnet_variant_group.setVisible(model_name == "resnet")
+
     def update_checkpoint_path(self):
-        """Update checkpoint path based on dataset and model selections"""
+        """Update checkpoint path based on selected dataset and model"""
         dataset = self.dataset_combo.currentText()
         model = self.model_combo.currentText()
 
-        if dataset and model:
-            # Set path to latest model for the selected dataset and model
-            ckpt_path = os.path.join(
-                self.default_config["train"]["output_dir"],
-                dataset,
-                model,
-                "latest.pth"
-            )
-            # 将反斜杠替换为正斜杠以保持一致性
-            ckpt_path = ckpt_path.replace("\\", "/")
-            self.ckpt_path_edit.setText(ckpt_path)
+        # 获取实际要使用的模型名称
+        actual_model = model
+        if model == "resnet":
+            actual_model = self.resnet_variant_combo.currentText()
+
+        # For autoencoder, we need to handle the checkpoint path differently
+        if model == "Autoencoder":
+            actual_model = "autoencoder"
+
+        ckpt_path = f"./ckpts/{dataset}/{actual_model}/latest.pth"
+        self.ckpt_path_edit.setText(ckpt_path)
 
     def browse_data_dir(self):
         dir_path = QFileDialog.getExistingDirectory(
@@ -368,42 +410,54 @@ class TestApp(QMainWindow):
                 self.set_ui_enabled(True)
 
     def start_testing(self):
-        # Get current selected dataset and model
-        selected_dataset = self.dataset_combo.currentText()
-        selected_model = self.model_combo.currentText()
-
-        # 获取检查点路径并统一斜杠
-        ckpt_path = os.path.abspath(self.ckpt_path_edit.text())
-        ckpt_path = ckpt_path.replace("\\", "/")
-
         # Create config dictionary
-        config_dict = {
-            "device": "cuda" if self.device_gpu.isChecked() else "cpu",
-            "datasets": self.default_config.get("datasets", {}),
-            "selected_dataset": selected_dataset,
-            "selected_model": selected_model,
-            "test": {
-                "batch_size": self.batch_size_spin.value(),
-                "ckpt_path": ckpt_path,
-            },
-        }
+        try:
+            selected_dataset = self.dataset_combo.currentText()
+            selected_model = self.model_combo.currentText()
+            
+            # Get the actual model name to use
+            actual_model = selected_model
+            if selected_model == "resnet":
+                actual_model = self.resnet_variant_combo.currentText()
 
-        config_path = "temp_test_config.yaml"
-        with open(config_path, "w") as f:
-            yaml.dump(config_dict, f)
+            # 获取检查点路径并统一斜杠
+            ckpt_path = os.path.abspath(self.ckpt_path_edit.text())
+            ckpt_path = ckpt_path.replace("\\", "/")
 
-        config = Configs(config_path=config_path)
+            # Create config dictionary
+            config_dict = {
+                "device": "cuda" if self.device_gpu.isChecked() else "cpu",
+                "datasets": self.default_config.get("datasets", {}),
+                "selected_dataset": selected_dataset,
+                "selected_model": actual_model,  # Use the actual model name (resnet18 instead of resnet)
+                "test": {
+                    "batch_size": self.batch_size_spin.value(),
+                    "ckpt_path": ckpt_path,
+                },
+            }
 
-        self.set_ui_enabled(False)
-        self.progress_bar.setStyleSheet(self.normal_style)
-        self.progress_label.setText("Testing started...")
+            config_path = "temp_test_config.yaml"
+            with open(config_path, "w") as f:
+                yaml.dump(config_dict, f)
 
-        self.testing_controller = TestController()
-        self.thread = TestThread(config, self.testing_controller)
-        self.thread.finished.connect(self.testing_finished)
-        self.thread.progress_update.connect(self.update_progress)
-        self.thread.accuracy_update.connect(self.update_accuracy)
-        self.thread.start()
+            config = Configs(config_path=config_path)
+
+            self.set_ui_enabled(False)
+            self.progress_bar.setStyleSheet(self.normal_style)
+            self.progress_label.setText("Testing started...")
+
+            self.testing_controller = TestController()
+            self.thread = TestThread(config, self.testing_controller)
+            self.thread.finished.connect(self.testing_finished)
+            self.thread.progress_update.connect(self.update_progress)
+            self.thread.accuracy_update.connect(self.update_accuracy)
+            self.thread.start()
+        except Exception as e:
+            print(f"Testing error: {e}")
+            self.set_ui_enabled(True)
+            QMessageBox.warning(
+                self, "Error", "Testing failed. Check console for details."
+            )
 
     def update_progress(self, current, total):
         progress = int((current / total) * 100) if total > 0 else 0

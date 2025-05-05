@@ -34,28 +34,33 @@ def main(
     # Load model based on selected model type
     if cfg.selected_model == "attention_cnn":
         model = AttentionCNN(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet18":
-        model = ResNet18(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet34":
-        model = ResNet34(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet50":
-        model = ResNet50(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet101":
-        model = ResNet101(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet152":
-        model = ResNet152(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet20":
-        model = ResNet20(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet32":
-        model = ResNet32(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet44":
-        model = ResNet44(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet56":
-        model = ResNet56(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet110":
-        model = ResNet110(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "resnet1202":
-        model = ResNet1202(num_classes=cfg.num_classes).to(device)
+    # Handle all ResNet variants
+    elif cfg.selected_model.startswith("resnet"):
+        # Create the appropriate ResNet variant based on selected model
+        if cfg.selected_model == "resnet18":
+            model = ResNet18(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet34":
+            model = ResNet34(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet50":
+            model = ResNet50(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet101":
+            model = ResNet101(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet152":
+            model = ResNet152(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet20":
+            model = ResNet20(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet32":
+            model = ResNet32(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet44":
+            model = ResNet44(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet56":
+            model = ResNet56(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet110":
+            model = ResNet110(num_classes=cfg.num_classes).to(device)
+        elif cfg.selected_model == "resnet1202":
+            model = ResNet1202(num_classes=cfg.num_classes).to(device)
+        else:
+            raise ValueError(f"Unknown ResNet variant: {cfg.selected_model}")
     elif cfg.selected_model == "Autoencoder":
         model = Autoencoder(num_classes=cfg.num_classes).to(device)
     else:

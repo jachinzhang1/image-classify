@@ -19,6 +19,11 @@ selected_dataset: cifar10
 
 model_types:
   - attention_cnn
+  - resnet
+  - Autoencoder
+
+# ResNet model variants
+resnet_variants:
   - resnet18
   - resnet34
   - resnet50
@@ -30,9 +35,9 @@ model_types:
   - resnet56
   - resnet110
   - resnet1202
-  - Autoencoder
 
 selected_model: attention_cnn
+selected_resnet_variant: resnet18  # Default ResNet variant
 
 train:
   n_epochs: 5
