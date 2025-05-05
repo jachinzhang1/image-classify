@@ -60,7 +60,7 @@ class Autoencoder(nn.Module):
         self.classifier = nn.Linear(embedding_dim, num_classes)
         
         
-    def encode(self, x):
+    def encode(self, x): 
         """编码器部分，提取特征嵌入"""
         features = self.encoder(x)
         embedding = self.embedding(features)
@@ -78,17 +78,22 @@ class Autoencoder(nn.Module):
         
 
 
-    def train_autoencoder(self, dataloader, optimizer=None, epochs=10, device='cuda'):
-        """独立训练自编码器部分"""
+    def train_autoencoder(self, dataloader, optimizer=None, epochs=10, device='cuda', 
+                          progress_callback=None, total_iterations=None):
+        """独立训练自编码器部分，支持进度报告"""
         if optimizer is None:
             optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         
         criterion = nn.MSELoss()
         self.train()
         
+        # 计算总迭代次数用于进度报告
+        if total_iterations is None:
+            total_iterations = epochs * len(dataloader)
+        
         for epoch in range(epochs):
             total_loss = 0
-            for images, _ in dataloader:
+            for i, (images, _) in enumerate(dataloader):
                 images = images.to(device)
                 
                 # 前向传播
@@ -105,7 +110,12 @@ class Autoencoder(nn.Module):
                 
                 total_loss += loss.item()
                 
+                # 进度报告
+                if progress_callback:
+                    current_iter = epoch * len(dataloader) + i + 1
+                    progress_callback.emit(current_iter, total_iterations, -epoch-1)  # 使用负数epoch表示预训练阶段
+                    
             avg_loss = total_loss / len(dataloader)
-            print(f'Epoch [{epoch+1}/{epochs}], Reconstruction Loss: {avg_loss:.4f}')
+            print(f'Pretrain Epoch [{epoch+1}/{epochs}], Reconstruction Loss: {avg_loss:.4f}')
 
 

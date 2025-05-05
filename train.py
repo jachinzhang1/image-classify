@@ -53,20 +53,30 @@ def main(
         model = ResNet1202(num_classes=cfg.num_classes).to(device)
     elif cfg.selected_model == "Autoencoder":
         model = Autoencoder(num_classes=cfg.num_classes).to(device)
-        # 添加自编码器预训练阶段
-        pretrain_epochs = cfg.training_config.get("pretrain_epochs", 5) 
-        pretrain_lr = cfg.training_config.get("pretrain_lr", 0.001)
         
-        pretrain_optimizer = torch.optim.Adam(model.parameters(), lr=pretrain_lr)
-        
-        model.train_autoencoder(
-            dataloader=dataloader,
-            optimizer=pretrain_optimizer,
-            epochs=pretrain_epochs,
-            device=device
-        )
-        
-        print(f"Autoencoder pre-training completed after {pretrain_epochs} epochs")
+        # 检查是否启用预训练
+        if cfg.training_config.get("use_pretrain", True):
+            # 添加自编码器预训练阶段
+            pretrain_epochs = cfg.training_config.get("pretrain_epochs", 5) 
+            pretrain_lr = cfg.training_config.get("pretrain_lr", 0.001)
+            
+            print(f"Starting autoencoder pre-training ({pretrain_epochs} epochs)...")
+            pretrain_optimizer = torch.optim.Adam(model.parameters(), lr=pretrain_lr)
+            
+            # 计算预训练总迭代次数
+            pretrain_iterations = pretrain_epochs * len(dataloader)
+            
+            # 调用自编码器训练方法，传入进度回调
+            model.train_autoencoder(
+                dataloader=dataloader,
+                optimizer=pretrain_optimizer,
+                epochs=pretrain_epochs,
+                device=device,
+                progress_callback=progress_callback,
+                total_iterations=pretrain_iterations
+            )
+            
+            print(f"Autoencoder pre-training completed after {pretrain_epochs} epochs")
         print("Starting classification training phase...")
     else:
         raise ValueError("Unsupported model type.")

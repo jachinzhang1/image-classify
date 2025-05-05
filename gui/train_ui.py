@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (
     QButtonGroup,
     QProgressBar,
     QComboBox,
+    QCheckBox,
 )
 from PyQt5.QtCore import QThread, pyqtSignal, QObject
 
@@ -223,6 +224,40 @@ class TrainingApp(QMainWindow):
         model_group.setLayout(model_layout)
         layout.addWidget(model_group)
 
+        # 在model_group布局之后添加
+        # 自编码器预训练设置（仅在选择Autoencoder模型时显示）
+        self.pretrain_group = QWidget()
+        pretrain_layout = QVBoxLayout()
+        pretrain_layout.addWidget(QLabel("<b>Autoencoder Pretraining</b>"))
+
+        # 添加是否启用预训练的复选框
+        self.enable_pretrain_check = QCheckBox("Enable autoencoder pretraining")
+        self.enable_pretrain_check.setChecked(True)
+        pretrain_layout.addWidget(self.enable_pretrain_check)
+
+        # 预训练轮数
+        self.pretrain_epochs_spin = QSpinBox()
+        self.pretrain_epochs_spin.setRange(1, 100)
+        self.pretrain_epochs_spin.setValue(5)
+        pretrain_layout.addWidget(QLabel("Pretraining Epochs:"))
+        pretrain_layout.addWidget(self.pretrain_epochs_spin)
+
+        # 预训练学习率
+        self.pretrain_lr_spin = QDoubleSpinBox()
+        self.pretrain_lr_spin.setRange(0.00001, 1.0)
+        self.pretrain_lr_spin.setDecimals(5)
+        self.pretrain_lr_spin.setSingleStep(0.0001)
+        self.pretrain_lr_spin.setValue(0.001)
+        pretrain_layout.addWidget(QLabel("Pretraining Learning Rate:"))
+        pretrain_layout.addWidget(self.pretrain_lr_spin)
+
+        self.pretrain_group.setLayout(pretrain_layout)
+        self.pretrain_group.setVisible(False)  # 默认隐藏
+        layout.addWidget(self.pretrain_group)
+
+        # 连接模型选择变化事件
+        self.model_combo.currentTextChanged.connect(self.on_model_changed)
+
         # Device selection - modified to use QRadioButton
         device_group = QWidget()
         device_layout = QHBoxLayout()
@@ -363,6 +398,11 @@ class TrainingApp(QMainWindow):
             self.dataset_desc_label.setText(
                 dataset_config.get("description", ""))
 
+    def on_model_changed(self, model_name):
+        """处理模型类型变更"""
+        # 根据是否为Autoencoder模型显示或隐藏预训练配置
+        self.pretrain_group.setVisible(model_name == "Autoencoder")
+
     def start_training(self):
         # Create config dictionary
         selected_dataset = self.dataset_combo.currentText()
@@ -379,6 +419,10 @@ class TrainingApp(QMainWindow):
                 "lr": float(self.lr_spin.value()),
                 "early_stopping_patience": self.patience_spin.value(),
                 "output_dir": os.path.abspath(self.output_dir_edit.text()),
+                # 添加预训练配置
+                "use_pretrain": self.enable_pretrain_check.isChecked() if hasattr(self, 'enable_pretrain_check') else True,
+                "pretrain_epochs": self.pretrain_epochs_spin.value() if hasattr(self, 'pretrain_epochs_spin') else 5,
+                "pretrain_lr": float(self.pretrain_lr_spin.value()) if hasattr(self, 'pretrain_lr_spin') else 0.001,
             },
         }
 
@@ -407,8 +451,17 @@ class TrainingApp(QMainWindow):
     def update_progress(self, current, total, epoch):
         progress = int((current / total) * 100) if total > 0 else 0
         self.progress_bar.setValue(progress)
-        self.progress_label.setText(
-            f"Epoch {epoch} - {current}/{total} iterations")
+        
+        # 根据epoch值判断是预训练还是分类训练
+        if epoch < 0:  # 负值表示预训练阶段
+            pretrain_epoch = -epoch
+            self.progress_label.setText(
+                f"Pretraining - Epoch {pretrain_epoch} - {current}/{total} iterations"
+            )
+        else:  # 正值表示分类训练阶段
+            self.progress_label.setText(
+                f"Classification - Epoch {epoch} - {current}/{total} iterations"
+            )
 
     def update_best_model(self, accuracy, epoch):
         self.progress_bar.setStyleSheet(self.normal_style)
