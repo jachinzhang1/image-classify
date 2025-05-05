@@ -30,6 +30,7 @@ model_types:
   - resnet56
   - resnet110
   - resnet1202
+  - AutoencoderKNN
 
 selected_model: attention_cnn
 

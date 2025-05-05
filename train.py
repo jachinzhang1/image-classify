@@ -10,6 +10,7 @@ from configs import Configs
 from dataset import get_dataloader
 from model.attention_cnn import AttentionCNN
 from model.resnet import ResNet18, ResNet34, ResNet50, ResNet101, ResNet152, ResNet20, ResNet32, ResNet44, ResNet56, ResNet110, ResNet1202
+from model.autoencoder_knn import AutoencoderKNN
 
 
 def main(
@@ -50,6 +51,8 @@ def main(
         model = ResNet110(num_classes=cfg.num_classes).to(device)
     elif cfg.selected_model == "resnet1202":
         model = ResNet1202(num_classes=cfg.num_classes).to(device)
+    elif cfg.selected_model == "AutoencoderKNN":
+        model = AutoencoderKNN(num_classes=cfg.num_classes).to(device)
     else:
         raise ValueError("Unsupported model type.")
 
@@ -111,7 +114,7 @@ def main(
         epoch_acc = correct / total_samples
         epoch_loss = np.mean(epoch_loss_list)
         print(
-            f"Epoch {epoch+1}/{n_epochs} Loss: {epoch_loss:.3f} Acc: {epoch_acc:.2f} Time: {toc-tic:.1f}s"
+            f"Epoch {epoch+1}/{n_epochs} Loss: {epoch_loss:.3f} Acc: {epoch_acc:.2%} Time: {toc-tic:.1f}s"
         )
         
         # Check if this is the best model so far

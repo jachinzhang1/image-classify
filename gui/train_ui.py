@@ -413,7 +413,7 @@ class TrainingApp(QMainWindow):
     def update_best_model(self, accuracy, epoch):
         self.progress_bar.setStyleSheet(self.normal_style)
         self.progress_label.setText(
-            f"Best model from epoch {epoch+1} (acc: {accuracy:.2f}%) will be saved as latest.pth"
+            f"Best model from epoch {epoch+1} (acc: {accuracy:.2%}) will be saved as latest.pth"
         )
 
     def set_ui_enabled(self, enabled):
@@ -430,7 +430,7 @@ class TrainingApp(QMainWindow):
         self.set_ui_enabled(True)
         if success:
             message = "Training completed successfully!\n"
-            message += f"Best model (acc: {self.thread.best_accuracy:.2f}% at epoch {self.thread.best_epoch+1}) "
+            message += f"Best model (acc: {self.thread.best_accuracy:.2%} at epoch {self.thread.best_epoch+1}) "
             message += "has been saved as latest.pth and in timestamped directory."
             QMessageBox.information(self, "Success", message)
         else:
