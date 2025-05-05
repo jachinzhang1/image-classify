@@ -5,7 +5,7 @@ from configs import Configs
 from dataset import get_dataloader
 from model.attention_cnn import AttentionCNN
 from model.resnet import ResNet18, ResNet34, ResNet50, ResNet101, ResNet152, ResNet20, ResNet32, ResNet44, ResNet56, ResNet110, ResNet1202
-from model.autoencoder_knn import AutoencoderKNN
+from model.autoencoder import Autoencoder
 
 def main(
     cfg: Configs,
@@ -56,8 +56,8 @@ def main(
         model = ResNet110(num_classes=cfg.num_classes).to(device)
     elif cfg.selected_model == "resnet1202":
         model = ResNet1202(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "AutoencoderKNN":
-        model = AutoencoderKNN(num_classes=cfg.num_classes).to(device)
+    elif cfg.selected_model == "Autoencoder":
+        model = Autoencoder(num_classes=cfg.num_classes).to(device)
     else:
         error_msg = f"Unsupported model type: {cfg.selected_model}"
         print(error_msg)

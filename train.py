@@ -10,7 +10,7 @@ from configs import Configs
 from dataset import get_dataloader
 from model.attention_cnn import AttentionCNN
 from model.resnet import ResNet18, ResNet34, ResNet50, ResNet101, ResNet152, ResNet20, ResNet32, ResNet44, ResNet56, ResNet110, ResNet1202
-from model.autoencoder_knn import AutoencoderKNN
+from model.autoencoder import Autoencoder
 
 
 def main(
@@ -51,8 +51,23 @@ def main(
         model = ResNet110(num_classes=cfg.num_classes).to(device)
     elif cfg.selected_model == "resnet1202":
         model = ResNet1202(num_classes=cfg.num_classes).to(device)
-    elif cfg.selected_model == "AutoencoderKNN":
-        model = AutoencoderKNN(num_classes=cfg.num_classes).to(device)
+    elif cfg.selected_model == "Autoencoder":
+        model = Autoencoder(num_classes=cfg.num_classes).to(device)
+        # 添加自编码器预训练阶段
+        pretrain_epochs = cfg.training_config.get("pretrain_epochs", 5) 
+        pretrain_lr = cfg.training_config.get("pretrain_lr", 0.001)
+        
+        pretrain_optimizer = torch.optim.Adam(model.parameters(), lr=pretrain_lr)
+        
+        model.train_autoencoder(
+            dataloader=dataloader,
+            optimizer=pretrain_optimizer,
+            epochs=pretrain_epochs,
+            device=device
+        )
+        
+        print(f"Autoencoder pre-training completed after {pretrain_epochs} epochs")
+        print("Starting classification training phase...")
     else:
         raise ValueError("Unsupported model type.")
 

@@ -42,9 +42,9 @@ class Decoder(nn.Module):
         return x
 
 
-class AutoencoderKNN(nn.Module):
+class Autoencoder(nn.Module):
     def __init__(self, num_classes=10, n_neighbors=5, embedding_dim=128):
-        super(AutoencoderKNN, self).__init__()
+        super(Autoencoder, self).__init__()
         self.encoder = Encoder()
         self.decoder = Decoder()
         
@@ -59,10 +59,6 @@ class AutoencoderKNN(nn.Module):
         # 分类头 - 用于标准训练流程
         self.classifier = nn.Linear(embedding_dim, num_classes)
         
-        # KNN classifier - 用于后续KNN方法
-        self.knn = KNeighborsClassifier(n_neighbors=n_neighbors)
-        self.num_classes = num_classes
-        self.fitted = False
         
     def encode(self, x):
         """编码器部分，提取特征嵌入"""
@@ -75,49 +71,13 @@ class AutoencoderKNN(nn.Module):
         embedding, _ = self.encode(x)
         return self.classifier(embedding)  # 返回分类结果
 
-    # 以下方法用于自编码器和KNN功能，不影响标准训练
     def get_reconstruction(self, x):
         """获取重建图像"""
         _, features = self.encode(x)
         return self.decoder(features)
         
-    def fit_knn(self, dataloader, device='cuda'):
-        """训练KNN分类器"""
-        self.eval()
-        all_embeddings = []
-        all_labels = []
-        
-        with torch.no_grad():
-            for images, labels in dataloader:
-                images = images.to(device)
-                embedding, _ = self.encode(images)
-                all_embeddings.append(embedding.cpu().numpy())
-                all_labels.append(labels.numpy())
-        
-        # 拼接批次数据
-        embeddings = np.vstack(all_embeddings)
-        labels = np.concatenate(all_labels)
-        
-        # 训练KNN分类器
-        self.knn.fit(embeddings, labels)
-        self.fitted = True
-        return self
-    
-    def predict_knn(self, x, return_proba=False):
-        """使用KNN进行预测"""
-        if not self.fitted:
-            raise RuntimeError("KNN classifier has not been fitted yet. Call fit_knn first.")
-        
-        self.eval()
-        with torch.no_grad():
-            embedding, _ = self.encode(x)
-            embedding = embedding.cpu().numpy()
-        
-        if return_proba:
-            return self.knn.predict_proba(embedding)
-        else:
-            return self.knn.predict(embedding)
-    
+
+
     def train_autoencoder(self, dataloader, optimizer=None, epochs=10, device='cuda'):
         """独立训练自编码器部分"""
         if optimizer is None:

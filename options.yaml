@@ -30,7 +30,7 @@ model_types:
   - resnet56
   - resnet110
   - resnet1202
-  - AutoencoderKNN
+  - Autoencoder
 
 selected_model: attention_cnn
 
@@ -40,6 +40,8 @@ train:
   lr: !!float 1e-3
   output_dir: ./ckpts
   early_stopping_patience: 10  # Number of epochs to wait before early stopping
+  pretrain_epochs: 5  
+  pretrain_lr: !!float 1e-3  
 
 test:
   batch_size: 64
