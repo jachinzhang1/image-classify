@@ -16,6 +16,7 @@ from model.resnet import (
     ResNet1202,
 )
 from model.autoencoder import Autoencoder
+from model.alexnet import AlexNet
 from typing import Any
 
 
@@ -92,6 +93,8 @@ def get_model(
                 controller=controller,
                 progress_callback=progress_callback,
             )
+    elif selected_model == "AlexNet":
+        model = AlexNet(num_classes).to(device)
     else:
         raise ValueError(f"Unsupported model type: {selected_model}")
 

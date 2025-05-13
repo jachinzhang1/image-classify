@@ -21,6 +21,7 @@ model_types:
   - attention_cnn
   - resnet
   - Autoencoder
+  - AlexNet
 
 # ResNet model variants
 resnet_variants:
