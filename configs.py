@@ -39,12 +39,12 @@ class Configs:
         self.resnet_variants = cfg.get("resnet_variants", ["resnet18"])
         self.selected_resnet_variant = cfg.get("selected_resnet_variant", "resnet18")
 
-        self.training_config = cfg.get(
+        self.training_config: dict[str, Any] = cfg.get(
             "train",
             {"n_epochs": 30, "batch_size": 64, "lr": 0.001, "output_dir": "ckpts"},
         )
 
-        self.test_config = cfg.get("test", {"batch_size": 1, "ckpt_path": None})
+        self.test_config: dict[str, Any] = cfg.get("test", {"batch_size": 1, "ckpt_path": None})
 
     def to_dict(self):
         return {
