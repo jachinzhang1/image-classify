@@ -1,6 +1,6 @@
 # 图像分类训练框架
 
-这是一个综合性的基于GUI的图像分类模型训练和测试框架。它支持多种数据集和模型架构，提供易于使用的配置和可视化界面。
+这是一个综合性的图像分类模型训练和测试框架。它支持多种数据集和模型架构，提供易于使用的配置和可视化界面。
 
 ## 如何运行
 
@@ -58,6 +58,7 @@ python main_ui.py
      model_types:
        - attention_cnn
        - resnet18
+       - AutoEncoder
        - my_new_model  # 你的新模型
      ```
 
@@ -100,17 +101,19 @@ python main_ui.py
 
 2. **更新数据集处理逻辑**：
    - 打开`dataset.py`
-   - 为你的数据集添加适当的变换：
+   - 为你的数据集添加适当的数据增强处理：
      ```python
+     # example
      my_new_dataset_transform = transforms.Compose([
          transforms.ToTensor(),
-         transforms.Normalize(mean=[...], std=[...])
+         transforms.Normalize(mean=[...], std=[...]),
+         ...
      ])
      ```
    - 更新`get_dataset_and_transform`函数：
      ```python
      elif dataset_name == "my_new_dataset":
-         # 对于标准PyTorch数据集
+         # 对于标准torchvision数据集
          return datasets.ImageFolder(
              root=data_root, transform=my_new_dataset_transform
          ), my_new_dataset_transform
@@ -118,9 +121,11 @@ python main_ui.py
      ```
 
 3. **添加类别标签**：
-   - 对于单图像测试，更新`single_image_test.py`中的`dataset_classes`：
+   - 对于单图像测试，更新`constants.py`：
      ```python
      "my_new_dataset": {
-         0: "类别1", 1: "类别2", # 等等
+         0: "类别1",
+         1: "类别2",
+         ...
      }
      ```
