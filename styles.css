@@ -1,0 +1,15 @@
+QWidget {
+    font-family: 'Microsoft YaHei';
+    font-size: 12pt;
+}
+QTabWidget::pane {
+    border: 1px solid #D4D4D4;
+    padding: 10px;
+}
+QTabBar::tab {
+    padding: 8px 15px;
+    font-size: 12pt;
+}
+QScrollArea {
+    border: none;
+}

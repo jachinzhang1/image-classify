@@ -9,7 +9,19 @@ from datetime import datetime
 from configs import Configs
 from dataset import get_dataloader
 from model.attention_cnn import AttentionCNN
-from model.resnet import ResNet18, ResNet34, ResNet50, ResNet101, ResNet152, ResNet20, ResNet32, ResNet44, ResNet56, ResNet110, ResNet1202
+from model.resnet import (
+    ResNet18,
+    ResNet34,
+    ResNet50,
+    ResNet101,
+    ResNet152,
+    ResNet20,
+    ResNet32,
+    ResNet44,
+    ResNet56,
+    ResNet110,
+    ResNet1202,
+)
 from model.autoencoder import Autoencoder
 
 
@@ -24,7 +36,7 @@ def main(
         cfg.data_root,
         cfg.training_config["batch_size"],
         dataset_name=cfg.selected_dataset,
-        train=True
+        train=True,
     )
 
     # Select model
@@ -59,19 +71,19 @@ def main(
             raise ValueError(f"Unknown ResNet variant: {cfg.selected_model}")
     elif cfg.selected_model == "Autoencoder":
         model = Autoencoder(num_classes=cfg.num_classes).to(device)
-        
+
         # Check if pretraining is enabled
         if cfg.training_config.get("use_pretrain", True):
             # Add autoencoder pretraining phase
-            pretrain_epochs = cfg.training_config.get("pretrain_epochs", 5) 
+            pretrain_epochs = cfg.training_config.get("pretrain_epochs", 5)
             pretrain_lr = cfg.training_config.get("pretrain_lr", 0.001)
-            
+
             print(f"Starting autoencoder pre-training ({pretrain_epochs} epochs)...")
             pretrain_optimizer = torch.optim.Adam(model.parameters(), lr=pretrain_lr)
-            
+
             # Calculate total pretraining iterations
             pretrain_iterations = pretrain_epochs * len(dataloader)
-            
+
             # Call autoencoder training method with progress callback
             model.train_autoencoder(
                 dataloader=dataloader,
@@ -80,43 +92,44 @@ def main(
                 device=device,
                 progress_callback=progress_callback,
                 total_iterations=pretrain_iterations,
-                controller=controller
+                controller=controller,
             )
     else:
         raise ValueError(f"Unknown model type: {cfg.selected_model}")
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(
-        model.parameters(), lr=cfg.training_config["lr"])
+    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.training_config["lr"])
     model.train()
     n_epochs = cfg.training_config["n_epochs"]
     total_iterations = n_epochs * len(dataloader)
 
     # Create output directory with hierarchical structure: dataset/model_type
-    # Check if the output_dir already contains dataset and model name 
+    # Check if the output_dir already contains dataset and model name
     # to avoid duplicate nesting
     output_dir = cfg.training_config["output_dir"]
     output_path_parts = output_dir.replace("\\", "/").split("/")
-    
+
     # If the output directory already has the dataset and model as last components, use it directly
-    if (len(output_path_parts) >= 2 and 
-        output_path_parts[-2] == cfg.selected_dataset and 
-        output_path_parts[-1] == cfg.selected_model):
+    if (
+        len(output_path_parts) >= 2
+        and output_path_parts[-2] == cfg.selected_dataset
+        and output_path_parts[-1] == cfg.selected_model
+    ):
         output_base = output_dir
     else:
         # Create hierarchical path with dataset and model type
         output_base = os.path.join(
             output_dir,
-            cfg.selected_dataset,   # First level: dataset name
-            cfg.selected_model      # Second level: model type
+            cfg.selected_dataset,  # First level: dataset name
+            cfg.selected_model,  # Second level: model type
         )
-        
+
     os.makedirs(output_base, exist_ok=True)
 
     # Early stopping parameters
     # Get from config or use default
     patience = cfg.training_config.get("early_stopping_patience", 10)
-    wait = 0       # Counter for patience
+    wait = 0  # Counter for patience
     best_acc = 0.0
     best_epoch = 0
     best_state_dict = None
@@ -137,8 +150,7 @@ def main(
 
             if progress_callback:
                 progress_callback.emit(
-                    epoch * len(dataloader) + i +
-                    1, total_iterations, epoch + 1
+                    epoch * len(dataloader) + i + 1, total_iterations, epoch + 1
                 )
 
             images, labels = images.to(device), labels.to(device)
@@ -168,7 +180,8 @@ def main(
 
             # No need to save best.pth, we'll save it at the end
             print(
-                f"Found new best model with accuracy: {best_acc:.4f} at epoch {epoch+1}")
+                f"Found new best model with accuracy: {best_acc:.4f} at epoch {epoch+1}"
+            )
 
             # Reset patience counter
             wait = 0
@@ -176,19 +189,22 @@ def main(
             # Increment patience counter
             wait += 1
             print(
-                f"No improvement for {wait} epochs. Best accuracy: {best_acc:.4f} at epoch {best_epoch+1}")
+                f"No improvement for {wait} epochs. Best accuracy: {best_acc:.4f} at epoch {best_epoch+1}"
+            )
 
             # Check if we should stop early
             if wait >= patience:
                 print(
-                    f"Early stopping at epoch {epoch+1}. No improvement for {patience} epochs.")
+                    f"Early stopping at epoch {epoch+1}. No improvement for {patience} epochs."
+                )
                 break
 
     # If we have a best model (which we should), load it back
     if best_state_dict is not None:
         model.load_state_dict(best_state_dict)
         print(
-            f"Loaded best model from epoch {best_epoch+1} with accuracy {best_acc:.4f}")
+            f"Loaded best model from epoch {best_epoch+1} with accuracy {best_acc:.4f}"
+        )
 
     # Save the best model in a timestamped directory
     curr_time = datetime.now().strftime("%Y%m%d-%H%M%S")

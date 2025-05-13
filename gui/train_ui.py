@@ -33,7 +33,7 @@ class TrainingThread(QThread):
     finished = pyqtSignal(bool)
     terminated = pyqtSignal()
     progress_update = pyqtSignal(int, int, int)  # current, total, epoch
-    best_model_update = pyqtSignal(float, int)   # accuracy, epoch
+    best_model_update = pyqtSignal(float, int)  # accuracy, epoch
 
     def __init__(self, config, controller):
         super().__init__()
@@ -45,7 +45,8 @@ class TrainingThread(QThread):
     def run(self):
         try:
             model, best_acc, best_epoch = main(
-                self.config, self.controller, self.progress_update)
+                self.config, self.controller, self.progress_update
+            )
             self.best_accuracy = best_acc
             self.best_epoch = best_epoch
 
@@ -126,8 +127,7 @@ class TrainingApp(QMainWindow):
             with open(self.config_path, "r") as f:
                 return yaml.safe_load(f)
         except FileNotFoundError:
-            print(
-                f"Warning: {self.config_path} not found, using hardcoded defaults")
+            print(f"Warning: {self.config_path} not found, using hardcoded defaults")
             return {
                 "device": "cuda",
                 "data_root": "./data",
@@ -241,8 +241,7 @@ class TrainingApp(QMainWindow):
         pretrain_layout.addWidget(QLabel("<b>Autoencoder Pretraining</b>"))
 
         # 添加是否启用预训练的复选框
-        self.enable_pretrain_check = QCheckBox(
-            "Enable autoencoder pretraining")
+        self.enable_pretrain_check = QCheckBox("Enable autoencoder pretraining")
         self.enable_pretrain_check.setChecked(True)
         pretrain_layout.addWidget(self.enable_pretrain_check)
 
@@ -271,7 +270,8 @@ class TrainingApp(QMainWindow):
 
         # 连接ResNet变体更改信号
         self.resnet_variant_combo.currentTextChanged.connect(
-            self.on_resnet_variant_changed)
+            self.on_resnet_variant_changed
+        )
 
         # Device selection - modified to use QRadioButton
         device_group = QWidget()
@@ -294,8 +294,7 @@ class TrainingApp(QMainWindow):
         control_layout.addWidget(self.train_btn)
         self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.setEnabled(False)
-        self.cancel_btn.clicked.connect(
-            self.cancel_training)  # Add click handler
+        self.cancel_btn.clicked.connect(self.cancel_training)  # Add click handler
         control_layout.addWidget(self.cancel_btn)
         layout.addLayout(control_layout)
 
@@ -319,27 +318,28 @@ class TrainingApp(QMainWindow):
         if datasets:
             self.dataset_combo.addItems(list(datasets.keys()))
             # Set current selected dataset
-            selected_dataset = self.default_config.get(
-                "selected_dataset", "cifar10")
+            selected_dataset = self.default_config.get("selected_dataset", "cifar10")
             index = self.dataset_combo.findText(selected_dataset)
             if index >= 0:
                 self.dataset_combo.setCurrentIndex(index)
                 # Show dataset description
                 if selected_dataset in datasets:
                     self.dataset_desc_label.setText(
-                        datasets[selected_dataset].get("description", ""))
+                        datasets[selected_dataset].get("description", "")
+                    )
 
             # Connect dataset change signal
-            self.dataset_combo.currentTextChanged.connect(
-                self.on_dataset_changed)
+            self.dataset_combo.currentTextChanged.connect(self.on_dataset_changed)
 
             # Set data directory
             if selected_dataset in datasets:
                 self.data_root_edit.setText(
-                    datasets[selected_dataset].get("path", "./data"))
+                    datasets[selected_dataset].get("path", "./data")
+                )
                 # Set number of classes
                 self.num_classes_spin.setValue(
-                    datasets[selected_dataset].get("num_classes", 10))
+                    datasets[selected_dataset].get("num_classes", 10)
+                )
         else:
             self.data_root_edit.setText(cfg.get("data_root", "./data"))
             self.num_classes_spin.setValue(cfg.get("num_classes", 10))
@@ -348,8 +348,7 @@ class TrainingApp(QMainWindow):
         self.batch_size_spin.setValue(cfg["train"].get("batch_size", 64))
         self.lr_spin.setValue(float(cfg["train"].get("lr", 0.001)))
         # Set patience value for early stopping
-        self.patience_spin.setValue(
-            cfg["train"].get("early_stopping_patience", 10))
+        self.patience_spin.setValue(cfg["train"].get("early_stopping_patience", 10))
         self.output_dir_edit.setText(cfg["train"].get("output_dir", "./ckpts"))
 
         # Set device radio button
@@ -366,8 +365,7 @@ class TrainingApp(QMainWindow):
         )
 
         # Set selected model
-        selected_model = self.default_config.get(
-            "selected_model", "attention_cnn")
+        selected_model = self.default_config.get("selected_model", "attention_cnn")
         index = self.model_combo.findText(selected_model)
         if index >= 0:
             self.model_combo.setCurrentIndex(index)
@@ -380,7 +378,8 @@ class TrainingApp(QMainWindow):
 
         # 设置选择的ResNet变体
         selected_variant = self.default_config.get(
-            "selected_resnet_variant", "resnet18")
+            "selected_resnet_variant", "resnet18"
+        )
         index = self.resnet_variant_combo.findText(selected_variant)
         if index >= 0:
             self.resnet_variant_combo.setCurrentIndex(index)
@@ -390,20 +389,19 @@ class TrainingApp(QMainWindow):
 
         # 连接ResNet变体更改信号
         self.resnet_variant_combo.currentTextChanged.connect(
-            self.on_resnet_variant_changed)
+            self.on_resnet_variant_changed
+        )
 
         # 根据当前选择的模型显示或隐藏ResNet变体选择
         self.update_resnet_variant_visibility(selected_model)
 
     def browse_data_dir(self):
-        dir_path = QFileDialog.getExistingDirectory(
-            self, "Select Data Directory")
+        dir_path = QFileDialog.getExistingDirectory(self, "Select Data Directory")
         if dir_path:
             self.data_root_edit.setText(dir_path)
 
     def browse_output_dir(self):
-        dir_path = QFileDialog.getExistingDirectory(
-            self, "Select Output Directory")
+        dir_path = QFileDialog.getExistingDirectory(self, "Select Output Directory")
         if dir_path:
             self.output_dir_edit.setText(dir_path)
 
@@ -430,11 +428,9 @@ class TrainingApp(QMainWindow):
             # Update data directory
             self.data_root_edit.setText(dataset_config.get("path", "./data"))
             # Update number of classes
-            self.num_classes_spin.setValue(
-                dataset_config.get("num_classes", 10))
+            self.num_classes_spin.setValue(dataset_config.get("num_classes", 10))
             # Update description
-            self.dataset_desc_label.setText(
-                dataset_config.get("description", ""))
+            self.dataset_desc_label.setText(dataset_config.get("description", ""))
             # Update output directory path
             self.update_output_dir_path()
 
@@ -496,8 +492,7 @@ class TrainingApp(QMainWindow):
             if self.device_cpu.isChecked():
                 device = torch.device("cpu")
             else:
-                device = torch.device(
-                    "cuda" if torch.cuda.is_available() else "cpu")
+                device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
             # Create training configuration dictionary
             config_dict = {
@@ -512,16 +507,30 @@ class TrainingApp(QMainWindow):
                     "lr": float(self.lr_spin.value()),
                     "early_stopping_patience": self.patience_spin.value(),
                     "output_dir": os.path.abspath(self.output_dir_edit.text()),
-                }
+                },
             }
 
             # Add pretraining configuration if Autoencoder is selected
             if selected_model == "Autoencoder":
-                config_dict["train"].update({
-                    "use_pretrain": self.enable_pretrain_check.isChecked() if hasattr(self, 'enable_pretrain_check') else True,
-                    "pretrain_epochs": self.pretrain_epochs_spin.value() if hasattr(self, 'pretrain_epochs_spin') else 5,
-                    "pretrain_lr": float(self.pretrain_lr_spin.value()) if hasattr(self, 'pretrain_lr_spin') else 0.001,
-                })
+                config_dict["train"].update(
+                    {
+                        "use_pretrain": (
+                            self.enable_pretrain_check.isChecked()
+                            if hasattr(self, "enable_pretrain_check")
+                            else True
+                        ),
+                        "pretrain_epochs": (
+                            self.pretrain_epochs_spin.value()
+                            if hasattr(self, "pretrain_epochs_spin")
+                            else 5
+                        ),
+                        "pretrain_lr": (
+                            float(self.pretrain_lr_spin.value())
+                            if hasattr(self, "pretrain_lr_spin")
+                            else 0.001
+                        ),
+                    }
+                )
 
             # Save configuration to temporary file
             config_path = "temp_train_config.yaml"

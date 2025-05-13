@@ -249,39 +249,40 @@ class TestApp(QMainWindow):
         if datasets:
             self.dataset_combo.addItems(list(datasets.keys()))
             # Set current selected dataset
-            selected_dataset = self.default_config.get(
-                "selected_dataset", "cifar10")
+            selected_dataset = self.default_config.get("selected_dataset", "cifar10")
             index = self.dataset_combo.findText(selected_dataset)
             if index >= 0:
                 self.dataset_combo.setCurrentIndex(index)
                 # Show dataset description
                 if selected_dataset in datasets:
                     self.dataset_desc_label.setText(
-                        datasets[selected_dataset].get("description", ""))
+                        datasets[selected_dataset].get("description", "")
+                    )
 
             # Connect dataset change signal
-            self.dataset_combo.currentTextChanged.connect(
-                self.on_dataset_changed)
+            self.dataset_combo.currentTextChanged.connect(self.on_dataset_changed)
 
             # Set data directory
             if selected_dataset in datasets:
                 self.data_root_edit.setText(
-                    datasets[selected_dataset].get("path", "./data"))
+                    datasets[selected_dataset].get("path", "./data")
+                )
                 # Set number of classes
                 self.num_classes_spin.setValue(
-                    datasets[selected_dataset].get("num_classes", 10))
+                    datasets[selected_dataset].get("num_classes", 10)
+                )
         else:
             self.data_root_edit.setText(cfg.get("data_root", "./data"))
             self.num_classes_spin.setValue(cfg.get("num_classes", 10))
 
         # Load model types
         self.model_combo.clear()
-        self.model_combo.addItems(self.default_config.get(
-            "model_types", ["attention_cnn"]))
+        self.model_combo.addItems(
+            self.default_config.get("model_types", ["attention_cnn"])
+        )
 
         # Set selected model
-        selected_model = self.default_config.get(
-            "selected_model", "attention_cnn")
+        selected_model = self.default_config.get("selected_model", "attention_cnn")
         index = self.model_combo.findText(selected_model)
         if index >= 0:
             self.model_combo.setCurrentIndex(index)
@@ -294,17 +295,20 @@ class TestApp(QMainWindow):
 
         # 设置选择的ResNet变体
         selected_variant = self.default_config.get(
-            "selected_resnet_variant", "resnet18")
+            "selected_resnet_variant", "resnet18"
+        )
         index = self.resnet_variant_combo.findText(selected_variant)
         if index >= 0:
             self.resnet_variant_combo.setCurrentIndex(index)
 
         # Connect model change signal
         self.model_combo.currentTextChanged.connect(self.on_model_changed)
-        
+
         # Connect ResNet variant change signal
-        self.resnet_variant_combo.currentTextChanged.connect(self.on_resnet_variant_changed)
-        
+        self.resnet_variant_combo.currentTextChanged.connect(
+            self.on_resnet_variant_changed
+        )
+
         # 根据当前选择的模型显示或隐藏ResNet变体选择
         self.update_resnet_variant_visibility(selected_model)
 
@@ -328,11 +332,9 @@ class TestApp(QMainWindow):
             # Update data directory
             self.data_root_edit.setText(dataset_config.get("path", "./data"))
             # Update number of classes
-            self.num_classes_spin.setValue(
-                dataset_config.get("num_classes", 10))
+            self.num_classes_spin.setValue(dataset_config.get("num_classes", 10))
             # Update description
-            self.dataset_desc_label.setText(
-                dataset_config.get("description", ""))
+            self.dataset_desc_label.setText(dataset_config.get("description", ""))
             # Update checkpoint path
             self.update_checkpoint_path()
 
@@ -372,8 +374,7 @@ class TestApp(QMainWindow):
         self.ckpt_path_edit.setText(ckpt_path)
 
     def browse_data_dir(self):
-        dir_path = QFileDialog.getExistingDirectory(
-            self, "Select Data Directory")
+        dir_path = QFileDialog.getExistingDirectory(self, "Select Data Directory")
         if dir_path:
             self.data_root_edit.setText(dir_path)
 
@@ -381,8 +382,9 @@ class TestApp(QMainWindow):
         # Start in the directory for the currently selected dataset/model
         dataset = self.dataset_combo.currentText()
         model = self.model_combo.currentText()
-        start_dir = os.path.join(
-            "./ckpts", dataset, model) if dataset and model else "./ckpts"
+        start_dir = (
+            os.path.join("./ckpts", dataset, model) if dataset and model else "./ckpts"
+        )
         # 将反斜杠替换为正斜杠以保持一致性
         start_dir = start_dir.replace("\\", "/")
 
@@ -414,7 +416,7 @@ class TestApp(QMainWindow):
         try:
             selected_dataset = self.dataset_combo.currentText()
             selected_model = self.model_combo.currentText()
-            
+
             # Get the actual model name to use
             actual_model = selected_model
             if selected_model == "resnet":
@@ -477,8 +479,7 @@ class TestApp(QMainWindow):
     def testing_finished(self, success):
         self.set_ui_enabled(True)
         if success:
-            QMessageBox.information(
-                self, "Success", "Testing completed successfully!")
+            QMessageBox.information(self, "Success", "Testing completed successfully!")
         else:
             QMessageBox.warning(
                 self, "Error", "Testing failed. Check console for details."

@@ -4,8 +4,21 @@ from typing import Optional
 from configs import Configs
 from dataset import get_dataloader
 from model.attention_cnn import AttentionCNN
-from model.resnet import ResNet18, ResNet34, ResNet50, ResNet101, ResNet152, ResNet20, ResNet32, ResNet44, ResNet56, ResNet110, ResNet1202
+from model.resnet import (
+    ResNet18,
+    ResNet34,
+    ResNet50,
+    ResNet101,
+    ResNet152,
+    ResNet20,
+    ResNet32,
+    ResNet44,
+    ResNet56,
+    ResNet110,
+    ResNet1202,
+)
 from model.autoencoder import Autoencoder
+
 
 def main(
     cfg: Configs,
@@ -14,13 +27,13 @@ def main(
     accuracy_callback: Optional[object] = None,
 ):
     device = cfg.device
-    
+
     # Use the selected dataset from config
     dataloader = get_dataloader(
-        cfg.data_root, 
-        cfg.test_config["batch_size"], 
+        cfg.data_root,
+        cfg.test_config["batch_size"],
         dataset_name=cfg.selected_dataset,
-        train=False
+        train=False,
     )
 
     # Check if checkpoint exists
@@ -70,15 +83,16 @@ def main(
 
     try:
         # Load the model weights
-        model.load_state_dict(torch.load(
-            cfg.test_config["ckpt_path"], map_location=device))
+        model.load_state_dict(
+            torch.load(cfg.test_config["ckpt_path"], map_location=device)
+        )
         model.eval()
-        
+
         # Perform evaluation
         correct, total_samples = 0, 0
         class_correct = [0] * cfg.num_classes
         class_total = [0] * cfg.num_classes
-        
+
         with torch.no_grad():
             for i, (images, labels) in enumerate(dataloader):
                 if controller and getattr(controller, "should_stop", False):
@@ -88,11 +102,11 @@ def main(
                 images, labels = images.to(device), labels.to(device)
                 outputs = model(images)
                 pred = outputs.argmax(1)
-                
+
                 # Overall accuracy
                 correct += (pred == labels).sum().item()
                 total_samples += labels.size(0)
-                
+
                 # Per-class accuracy
                 for j in range(labels.size(0)):
                     label = labels[j].item()
@@ -106,18 +120,20 @@ def main(
         acc = correct / total_samples
         if accuracy_callback:
             accuracy_callback.emit(acc)
-            
+
         print(f"Overall Accuracy: {acc:.4f}")
-        
+
         # Print per-class accuracy
         print("\nPer-class accuracy:")
         for i in range(cfg.num_classes):
             if class_total[i] > 0:
                 class_acc = class_correct[i] / class_total[i]
-                print(f"  Class {i}: {class_acc:.4f} ({class_correct[i]}/{class_total[i]})")
+                print(
+                    f"  Class {i}: {class_acc:.4f} ({class_correct[i]}/{class_total[i]})"
+                )
             else:
                 print(f"  Class {i}: No samples")
-                
+
     except Exception as e:
         error_msg = f"Error during testing: {str(e)}"
         print(error_msg)

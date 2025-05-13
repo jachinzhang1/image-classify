@@ -1,5 +1,16 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QTabWidget, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+    QScrollArea,
+    QSpinBox,
+    QDoubleSpinBox,
+    QComboBox,
+)
+from PyQt5.QtCore import QEvent
 from gui.train_ui import TrainingApp
 from gui.test_ui import TestApp
 from gui.single_image_ui import SingleImageApp
@@ -9,31 +20,25 @@ class MainApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Image Classification Model Training & Testing Interface")
-        self.setStyleSheet(
-            """
-            QWidget {
-                font-family: 'Microsoft YaHei';
-                font-size: 12pt;
-            }
-            QTabWidget::pane {
-                border: 1px solid #D4D4D4;
-                padding: 10px;
-            }
-            QTabBar::tab {
-                padding: 8px 15px;
-                font-size: 12pt;
-            }
-        """
-        )
         self.setGeometry(400, 200, 1600, 1500)
 
-        self.central_widget = QWidget()
-        self.setCentralWidget(self.central_widget)
+        # load styles from CSS file
+        self.load_styles()
+
+        # Create scroll area
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.setCentralWidget(self.scroll)
+
+        # Create container widget
+        self.container = QWidget()
+        self.scroll.setWidget(self.container)
+        self.installEventFilter(self)
 
         self.init_ui()
 
     def init_ui(self):
-        layout = QVBoxLayout()
+        layout = QVBoxLayout(self.container)
 
         # Create tab widget
         self.tabs = QTabWidget()
@@ -54,7 +59,20 @@ class MainApp(QMainWindow):
         self.tabs.addTab(self.single_image_ui.central_widget, "Single Image Test")
 
         layout.addWidget(self.tabs)
-        self.central_widget.setLayout(layout)
+
+    def load_styles(self):
+        try:
+            with open("styles.css", "r") as f:
+                self.setStyleSheet(f.read())
+        except FileNotFoundError:
+            print("Warning: styles.css not found, using default styles")
+
+    def eventFilter(self, obj, event):
+        if event.type() == event.Wheel and isinstance(
+            obj, (QSpinBox, QDoubleSpinBox, QComboBox)
+        ):
+            return True  # Block wheel events for numeric inputs
+        return super().eventFilter(obj, event)
 
 
 if __name__ == "__main__":

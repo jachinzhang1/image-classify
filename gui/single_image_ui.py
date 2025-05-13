@@ -114,7 +114,7 @@ class SingleImageApp(QMainWindow):
         # Image display
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignCenter)
-        self.image_label.setMinimumSize(300, 700)
+        self.image_label.setMinimumSize(300, 1000)
         self.image_label.setStyleSheet("border: 1px solid black;")
         image_layout.addWidget(self.image_label)
 
@@ -150,11 +150,11 @@ class SingleImageApp(QMainWindow):
                 # Show dataset description
                 if selected_dataset in datasets:
                     self.dataset_desc_label.setText(
-                        datasets[selected_dataset].get("description", ""))
+                        datasets[selected_dataset].get("description", "")
+                    )
 
             # Connect dataset change signal
-            self.dataset_combo.currentTextChanged.connect(
-                self.on_dataset_changed)
+            self.dataset_combo.currentTextChanged.connect(self.on_dataset_changed)
 
         # Load model types
         self.model_combo.clear()
@@ -180,7 +180,9 @@ class SingleImageApp(QMainWindow):
         self.model_combo.currentTextChanged.connect(self.on_model_changed)
 
         # Connect ResNet variant change signal
-        self.resnet_variant_combo.currentTextChanged.connect(self.on_resnet_variant_changed)
+        self.resnet_variant_combo.currentTextChanged.connect(
+            self.on_resnet_variant_changed
+        )
 
         # 根据当前选择的模型显示或隐藏ResNet变体选择
         self.update_resnet_variant_visibility(selected_model)
@@ -193,8 +195,7 @@ class SingleImageApp(QMainWindow):
         if dataset_name in self.config.datasets:
             dataset_config = self.config.datasets[dataset_name]
             # Update description
-            self.dataset_desc_label.setText(
-                dataset_config.get("description", ""))
+            self.dataset_desc_label.setText(dataset_config.get("description", ""))
             # Update configuration
             self.config.update_dataset(dataset_name)
             # Update checkpoint path
@@ -244,8 +245,9 @@ class SingleImageApp(QMainWindow):
         # Start in the directory for the currently selected dataset/model
         dataset = self.dataset_combo.currentText()
         model = self.model_combo.currentText()
-        start_dir = os.path.join(
-            "./ckpts", dataset, model) if dataset and model else "./ckpts"
+        start_dir = (
+            os.path.join("./ckpts", dataset, model) if dataset and model else "./ckpts"
+        )
         # 将反斜杠替换为正斜杠以保持一致性
         start_dir = start_dir.replace("\\", "/")
 
@@ -273,8 +275,7 @@ class SingleImageApp(QMainWindow):
             self.update_status()
 
     def update_status(self):
-        ready = bool(self.ckpt_path_edit.text()) and bool(
-            self.image_path_edit.text())
+        ready = bool(self.ckpt_path_edit.text()) and bool(self.image_path_edit.text())
         if ready:
             self.status_label.setText("Ready to test")
             self.status_label.setStyleSheet("")
@@ -290,10 +291,10 @@ class SingleImageApp(QMainWindow):
             if not image_path or not os.path.isfile(image_path):
                 self.status_label.setText("Please select a valid image file")
                 return
-                
+
             # Get selected model type
             selected_model = self.model_combo.currentText()
-            
+
             # Get the actual model name to use
             actual_model = selected_model
             if selected_model == "resnet":
@@ -303,7 +304,7 @@ class SingleImageApp(QMainWindow):
             selected_dataset = self.dataset_combo.currentText()
             if selected_dataset in self.config.datasets:
                 self.config.update_dataset(selected_dataset)
-                
+
             # Update selected model in config
             self.config.selected_model = actual_model
 
@@ -318,13 +319,10 @@ class SingleImageApp(QMainWindow):
             # Update config
             self.config.test_config["ckpt_path"] = ckpt_path
 
-            class_idx = classify_image(
-                self.config, image_path)
-            self.result_label.setText(
-                f"Predicted class: {class_dict[class_idx]}")
+            class_idx = classify_image(self.config, image_path)
+            self.result_label.setText(f"Predicted class: {class_dict[class_idx]}")
         except Exception as e:
-            QMessageBox.warning(
-                self, "Error", f"Classification failed: {str(e)}")
+            QMessageBox.warning(self, "Error", f"Classification failed: {str(e)}")
 
     def clear_result(self):
         """Clear previous classification result"""

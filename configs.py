@@ -37,16 +37,14 @@ class Configs:
 
         # ResNet variant configuration
         self.resnet_variants = cfg.get("resnet_variants", ["resnet18"])
-        self.selected_resnet_variant = cfg.get(
-            "selected_resnet_variant", "resnet18")
+        self.selected_resnet_variant = cfg.get("selected_resnet_variant", "resnet18")
 
         self.training_config = cfg.get(
             "train",
             {"n_epochs": 30, "batch_size": 64, "lr": 0.001, "output_dir": "ckpts"},
         )
 
-        self.test_config = cfg.get(
-            "test", {"batch_size": 1, "ckpt_path": None})
+        self.test_config = cfg.get("test", {"batch_size": 1, "ckpt_path": None})
 
     def to_dict(self):
         return {
@@ -65,12 +63,12 @@ class Configs:
         if dataset_name in self.datasets:
             self.selected_dataset = dataset_name
             dataset_config = self.datasets[dataset_name]
-            
+
             # Only update data_root if it wasn't directly specified in the config
             # This preserves any user modifications to the path
             if self.data_root == "./data" or self.data_root is None:
                 self.data_root = dataset_config.get("path", "./data")
-                
+
             self.num_classes = dataset_config.get("num_classes", 10)
             return True
         return False

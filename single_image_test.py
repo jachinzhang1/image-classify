@@ -5,36 +5,22 @@ from PIL import Image
 from torchvision import transforms
 from configs import Configs
 from model.attention_cnn import AttentionCNN
-from model.resnet import ResNet18, ResNet34, ResNet50, ResNet101, ResNet152, ResNet20, ResNet32, ResNet44, ResNet56, ResNet110, ResNet1202
+from model.resnet import (
+    ResNet18,
+    ResNet34,
+    ResNet50,
+    ResNet101,
+    ResNet152,
+    ResNet20,
+    ResNet32,
+    ResNet44,
+    ResNet56,
+    ResNet110,
+    ResNet1202,
+)
 from model.autoencoder import Autoencoder
 from dataset import cifar_transform, mnist_transform
-
-# Default class dictionary for CIFAR-10
-class_dict = {
-    0: "airplane",
-    1: "automobile",
-    2: "bird",
-    3: "cat",
-    4: "deer",
-    5: "dog",
-    6: "frog",
-    7: "horse",
-    8: "ship",
-    9: "truck",
-}
-
-# Class dictionaries for other datasets
-dataset_classes = {
-    "cifar10": {
-        0: "airplane", 1: "automobile", 2: "bird", 3: "cat", 4: "deer",
-        5: "dog", 6: "frog", 7: "horse", 8: "ship", 9: "truck"
-    },
-    "cifar100": {},  # Will be dynamically loaded if needed
-    "mnist": {
-        0: "0", 1: "1", 2: "2", 3: "3", 4: "4",
-        5: "5", 6: "6", 7: "7", 8: "8", 9: "9"
-    },
-}
+from constants import class_dict, dataset_classes
 
 
 def get_class_names(dataset_name, data_root, num_classes):
@@ -47,8 +33,11 @@ def get_class_names(dataset_name, data_root, num_classes):
         classes = {}
         if dataset_name == "custom":
             # Try to find class folders in the data directory
-            class_dirs = [d for d in os.listdir(data_root)
-                          if os.path.isdir(os.path.join(data_root, d))]
+            class_dirs = [
+                d
+                for d in os.listdir(data_root)
+                if os.path.isdir(os.path.join(data_root, d))
+            ]
             class_dirs.sort()
             for i, class_name in enumerate(class_dirs):
                 if i < num_classes:
@@ -77,7 +66,8 @@ def get_transform_for_dataset(dataset_name):
     else:
         # Default to CIFAR transform for unrecognized datasets
         print(
-            f"Warning: Transform for '{dataset_name}' not found, using CIFAR transform.")
+            f"Warning: Transform for '{dataset_name}' not found, using CIFAR transform."
+        )
         return cifar_transform
 
 
@@ -107,7 +97,8 @@ def classify_image(cfg: Configs, image_path: str):
     # Check if checkpoint exists
     if not os.path.exists(cfg.test_config["ckpt_path"]):
         raise FileNotFoundError(
-            f"Checkpoint file {cfg.test_config['ckpt_path']} not found.")
+            f"Checkpoint file {cfg.test_config['ckpt_path']} not found."
+        )
 
     # Load model
     if cfg.selected_model == "attention_cnn":
@@ -145,8 +136,9 @@ def classify_image(cfg: Configs, image_path: str):
         raise ValueError(f"Unsupported model type: {cfg.selected_model}")
 
     try:
-        model.load_state_dict(torch.load(
-            cfg.test_config["ckpt_path"], map_location=device))
+        model.load_state_dict(
+            torch.load(cfg.test_config["ckpt_path"], map_location=device)
+        )
         model.eval()
 
         # Classify
@@ -155,8 +147,7 @@ def classify_image(cfg: Configs, image_path: str):
             _, predicted = torch.max(output.data, 1)
 
         # Get class names for the dataset
-        classes = get_class_names(
-            cfg.selected_dataset, cfg.data_root, cfg.num_classes)
+        classes = get_class_names(cfg.selected_dataset, cfg.data_root, cfg.num_classes)
         class_idx = predicted.item()
 
         # Update global class_dict for the UI to use
@@ -182,8 +173,8 @@ if __name__ == "__main__":
 
             class_idx = classify_image(config, image_path)
             classes = get_class_names(
-                config.selected_dataset, config.data_root, config.num_classes)
-            print(
-                f"Predicted class: {classes[class_idx]} (index: {class_idx})")
+                config.selected_dataset, config.data_root, config.num_classes
+            )
+            print(f"Predicted class: {classes[class_idx]} (index: {class_idx})")
         except Exception as e:
             print(f"Error: {str(e)}")
