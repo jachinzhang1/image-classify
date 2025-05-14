@@ -76,11 +76,11 @@ class MBConvBlock(nn.Module):
         # 投影
         x = self.project_conv(x)
         
-        # 残差连接
+        # 残差连接，修改随机深度的处理方式，避免返回None
         if self.use_residual:
             if self.training and self.drop_rate > 0:
-                if torch.rand(1) < self.drop_rate:
-                    return identity
+                # 使用dropout而不是完全跳过
+                x = self.dropout(x)
             x = identity + x
             
         return x
@@ -166,15 +166,20 @@ class EfficientNetB0(nn.Module):
     def _initialize_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.weight is not None:
+                    nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
             elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
+                if m.weight is not None:
+                    nn.init.constant_(m.weight, 1)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
             elif isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, 0, 0.01)
-                nn.init.constant_(m.bias, 0)
+                if m.weight is not None:
+                    nn.init.normal_(m.weight, 0, 0.01)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
 
 def EfficientNet(num_classes=10, variant='b0'):
     """

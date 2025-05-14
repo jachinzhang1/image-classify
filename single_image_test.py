@@ -5,7 +5,7 @@ from PIL import Image
 from torchvision import transforms
 from configs import Configs
 from utils import get_model
-from dataset import cifar_transform, mnist_transform
+from dataset import cifar_transform, mnist_transform, large_input_transform, mnist_large_input_transform
 from constants import class_dict, dataset_classes
 
 
@@ -33,6 +33,7 @@ def get_class_names(dataset_name, data_root, num_classes):
         if not classes:
             classes = {i: str(i) for i in range(num_classes)}
 
+     
         # Cache the classes
         dataset_classes[dataset_name] = classes
         return classes
@@ -43,8 +44,19 @@ def get_class_names(dataset_name, data_root, num_classes):
         return {i: str(i) for i in range(num_classes)}
 
 
-def get_transform_for_dataset(dataset_name):
-    """Get the appropriate transform for the dataset"""
+def get_transform_for_dataset(dataset_name, model_type=None):
+    """Get the appropriate transform for the dataset and model type"""
+    # 需要大尺寸输入的模型列表
+    large_input_models = ["inception", "efficientnet", "vgg11", "vgg13", "vgg16", "vgg19"]
+    
+    # 对于需要大尺寸输入的模型使用224x224的尺寸
+    if model_type in large_input_models or (model_type is not None and any(model_type.startswith(prefix) for prefix in ["efficientnet", "vgg"])):
+        if dataset_name == "mnist":
+            return mnist_large_input_transform
+        else:  # cifar10, cifar100等
+            return large_input_transform
+    
+    # 对于其他模型使用原始转换
     if dataset_name == "cifar10" or dataset_name == "cifar100":
         return cifar_transform
     elif dataset_name == "mnist":
@@ -60,20 +72,34 @@ def get_transform_for_dataset(dataset_name):
 def classify_image(cfg: Configs, image_path: str):
     device = cfg.device
 
-    # Get the appropriate transform for the dataset
-    transform = get_transform_for_dataset(cfg.selected_dataset)
+    # Get the appropriate transform for the dataset and model
+    transform = get_transform_for_dataset(cfg.selected_dataset, cfg.selected_model)
+
+    # 需要大尺寸输入的模型列表
+    large_input_models = ["inception", "efficientnet", "vgg11", "vgg13", "vgg16", "vgg19"]
+    uses_large_input = (cfg.selected_model in large_input_models or 
+                       any(cfg.selected_model.startswith(prefix) for prefix in ["efficientnet", "vgg"]))
 
     # Load and preprocess image
     try:
         image = Image.open(image_path)
 
-        # For MNIST, convert to grayscale first
-        if cfg.selected_dataset == "mnist":
-            image = image.convert("L")  # Convert to grayscale
-            image = transforms.Resize((28, 28))(image)
-        else:  # CIFAR and others need RGB
-            image = image.convert("RGB")
-            image = transforms.Resize((32, 32))(image)
+        # 根据模型类型和数据集类型调整大小
+        if uses_large_input:
+            # 需要大尺寸输入的模型
+            if cfg.selected_dataset == "mnist":
+                image = image.convert("L")  # Convert to grayscale
+            else:
+                image = image.convert("RGB")
+            image = transforms.Resize((224, 224))(image)
+        else:
+            # 其他模型使用原始尺寸
+            if cfg.selected_dataset == "mnist":
+                image = image.convert("L")  # Convert to grayscale
+                image = transforms.Resize((28, 28))(image)
+            else:  # CIFAR and others need RGB
+                image = image.convert("RGB")
+                image = transforms.Resize((32, 32))(image)
 
         # Apply the transform and prepare tensor (transform will handle channel duplication for MNIST)
         image_tensor = transform(image).unsqueeze(0).to(device)
@@ -99,6 +125,11 @@ def classify_image(cfg: Configs, image_path: str):
         # Classify
         with torch.no_grad():
             output = model(image_tensor)
+            
+            # 处理Inception模型在评估模式下的输出
+            if isinstance(output, tuple):
+                output = output[0]  # 使用主输出
+                
             _, predicted = torch.max(output.data, 1)
 
         # Get class names for the dataset

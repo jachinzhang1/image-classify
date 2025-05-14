@@ -20,6 +20,7 @@ def main(
         cfg.test_config["batch_size"],
         dataset_name=cfg.selected_dataset,
         train=False,
+        model_type=cfg.selected_model,
     )
 
     # Check if checkpoint exists
@@ -54,6 +55,12 @@ def main(
 
                 images, labels = images.to(device), labels.to(device)
                 outputs = model(images)
+                
+                # 处理Inception模型在评估模式下的输出
+                # 在评估模式下，Inception通常只返回主输出，但为了安全起见，我们仍进行检查
+                if isinstance(outputs, tuple):
+                    outputs = outputs[0]  # 使用主输出
+                    
                 pred = outputs.argmax(1)
 
                 # Overall accuracy

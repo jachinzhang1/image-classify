@@ -23,6 +23,7 @@ def main(
         cfg.training_config["batch_size"],
         dataset_name=cfg.selected_dataset,
         train=True,
+        model_type=cfg.selected_model,
     )
 
     model = get_model(
@@ -93,14 +94,33 @@ def main(
 
             images, labels = images.to(device), labels.to(device)
             outputs = model(images)
+            
+            # 处理Inception模型的多输出情况
+            if cfg.selected_model == "inception" and isinstance(outputs, tuple):
+                # 在训练模式下，Inception模型会返回(主输出, 辅助输出1, 辅助输出2)
+                # 计算所有输出的损失并加权
+                main_output = outputs[0]
+                aux_outputs = outputs[1:]
+                
+                # 主输出的损失
+                loss = criterion(main_output, labels)
+                
+                # 添加辅助分类器的损失，权重为0.3
+                for aux_output in aux_outputs:
+                    loss += 0.3 * criterion(aux_output, labels)
+                
+                # 使用主输出计算准确率
+                correct += (main_output.argmax(1) == labels).sum().item()
+            else:
+                # 对于其他模型，直接计算损失
+                loss = criterion(outputs, labels)
+                correct += (outputs.argmax(1) == labels).sum().item()
 
-            loss = criterion(outputs, labels)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             epoch_loss_list.append(loss.item())
-            correct += (outputs.argmax(1) == labels).sum().item()
             total_samples += labels.size(0)
 
         toc = time()
