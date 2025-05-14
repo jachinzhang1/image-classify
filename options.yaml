@@ -27,6 +27,7 @@ model_types:
   - densenet
   - inception
   - efficientnet
+  - lightweight_attn
 
 # ResNet model variants
 resnet_variants:
@@ -60,7 +61,8 @@ densenet_variants:
 efficientnet_variants:
   - efficientnet-b0
 
-selected_model: attention_cnn
+# 注：我们设置新模型为默认选项
+selected_model: lightweight_attn
 selected_resnet_variant: resnet18  # Default ResNet variant
 selected_vgg_variant: vgg16  # Default VGG variant
 selected_densenet_variant: densenet121  # Default DenseNet variant
@@ -77,4 +79,4 @@ train:
 
 test:
   batch_size: 64
-  ckpt_path: ckpts/cifar10/attention_cnn/latest.pth
+  ckpt_path: ckpts/cifar10/lightweight_attn/latest.pth

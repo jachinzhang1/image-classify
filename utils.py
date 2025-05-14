@@ -22,6 +22,7 @@ from model.mobilenet import MobileNet
 from model.densenet import DenseNet121, DenseNet169, DenseNet201, DenseNet264
 from model.inception import Inception
 from model.efficientnet import EfficientNet
+from model.lightweight_attn import LightweightAttn
 from typing import Any
 
 
@@ -131,6 +132,8 @@ def get_model(
             model = EfficientNet(num_classes, variant='b0').to(device)
         else:
             raise ValueError(f"Unknown EfficientNet variant: {selected_model}")
+    elif selected_model == "lightweight_attn":
+        model = LightweightAttn(num_classes, width_mult=0.5).to(device)
     else:
         raise ValueError(f"Unsupported model type: {selected_model}")
 
