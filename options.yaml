@@ -22,6 +22,11 @@ model_types:
   - resnet
   - Autoencoder
   - AlexNet
+  - vgg
+  - mobilenet
+  - densenet
+  - inception
+  - efficientnet
 
 # ResNet model variants
 resnet_variants:
@@ -37,8 +42,29 @@ resnet_variants:
   - resnet110
   - resnet1202
 
+# VGG model variants
+vgg_variants:
+  - vgg11
+  - vgg13
+  - vgg16
+  - vgg19
+
+# DenseNet model variants
+densenet_variants:
+  - densenet121
+  - densenet169
+  - densenet201
+  - densenet264
+  
+# EfficientNet model variants
+efficientnet_variants:
+  - efficientnet-b0
+
 selected_model: attention_cnn
 selected_resnet_variant: resnet18  # Default ResNet variant
+selected_vgg_variant: vgg16  # Default VGG variant
+selected_densenet_variant: densenet121  # Default DenseNet variant
+selected_efficientnet_variant: efficientnet-b0  # Default EfficientNet variant
 
 train:
   n_epochs: 5

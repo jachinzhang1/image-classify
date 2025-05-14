@@ -17,6 +17,11 @@ from model.resnet import (
 )
 from model.autoencoder import Autoencoder
 from model.alexnet import AlexNet
+from model.vgg import VGG11, VGG13, VGG16, VGG19
+from model.mobilenet import MobileNet
+from model.densenet import DenseNet121, DenseNet169, DenseNet201, DenseNet264
+from model.inception import Inception
+from model.efficientnet import EfficientNet
 from typing import Any
 
 
@@ -95,6 +100,37 @@ def get_model(
             )
     elif selected_model == "AlexNet":
         model = AlexNet(num_classes).to(device)
+    elif selected_model.startswith("vgg"):
+        if selected_model.endswith("11"):
+            model = VGG11(num_classes).to(device)
+        elif selected_model.endswith("13"):
+            model = VGG13(num_classes).to(device)
+        elif selected_model.endswith("16"):
+            model = VGG16(num_classes).to(device)
+        elif selected_model.endswith("19"):
+            model = VGG19(num_classes).to(device)
+        else:
+            raise ValueError(f"Unknown VGG variant: {selected_model}")
+    elif selected_model == "mobilenet":
+        model = MobileNet(num_classes).to(device)
+    elif selected_model.startswith("densenet"):
+        if selected_model.endswith("121"):
+            model = DenseNet121(num_classes).to(device)
+        elif selected_model.endswith("169"):
+            model = DenseNet169(num_classes).to(device)
+        elif selected_model.endswith("201"):
+            model = DenseNet201(num_classes).to(device)
+        elif selected_model.endswith("264"):
+            model = DenseNet264(num_classes).to(device)
+        else:
+            raise ValueError(f"Unknown DenseNet variant: {selected_model}")
+    elif selected_model == "inception":
+        model = Inception(num_classes).to(device)
+    elif selected_model.startswith("efficientnet"):
+        if selected_model.endswith("b0"):
+            model = EfficientNet(num_classes, variant='b0').to(device)
+        else:
+            raise ValueError(f"Unknown EfficientNet variant: {selected_model}")
     else:
         raise ValueError(f"Unsupported model type: {selected_model}")
 

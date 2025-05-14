@@ -226,6 +226,36 @@ class TrainingApp(QMainWindow):
         self.resnet_variant_group.setVisible(False)  # Default hidden
         model_layout.addWidget(self.resnet_variant_group)
 
+        # VGG变体选择下拉框
+        self.vgg_variant_group = QWidget()
+        vgg_variant_layout = QVBoxLayout()
+        vgg_variant_layout.addWidget(QLabel("VGG Variant:"))
+        self.vgg_variant_combo = QComboBox()
+        vgg_variant_layout.addWidget(self.vgg_variant_combo)
+        self.vgg_variant_group.setLayout(vgg_variant_layout)
+        self.vgg_variant_group.setVisible(False)  # 默认隐藏
+        model_layout.addWidget(self.vgg_variant_group)
+        
+        # DenseNet变体选择下拉框
+        self.densenet_variant_group = QWidget()
+        densenet_variant_layout = QVBoxLayout()
+        densenet_variant_layout.addWidget(QLabel("DenseNet Variant:"))
+        self.densenet_variant_combo = QComboBox()
+        densenet_variant_layout.addWidget(self.densenet_variant_combo)
+        self.densenet_variant_group.setLayout(densenet_variant_layout)
+        self.densenet_variant_group.setVisible(False)  # 默认隐藏
+        model_layout.addWidget(self.densenet_variant_group)
+        
+        # EfficientNet变体选择下拉框
+        self.efficientnet_variant_group = QWidget()
+        efficientnet_variant_layout = QVBoxLayout()
+        efficientnet_variant_layout.addWidget(QLabel("EfficientNet Variant:"))
+        self.efficientnet_variant_combo = QComboBox()
+        efficientnet_variant_layout.addWidget(self.efficientnet_variant_combo)
+        self.efficientnet_variant_group.setLayout(efficientnet_variant_layout)
+        self.efficientnet_variant_group.setVisible(False)  # 默认隐藏
+        model_layout.addWidget(self.efficientnet_variant_group)
+
         self.num_classes_spin = QSpinBox()
         self.num_classes_spin.setRange(1, 1000)
         model_layout.addWidget(QLabel("Number of Classes:"))
@@ -270,7 +300,7 @@ class TrainingApp(QMainWindow):
 
         # 连接ResNet变体更改信号
         self.resnet_variant_combo.currentTextChanged.connect(
-            self.on_resnet_variant_changed
+            self.on_model_variant_changed
         )
 
         # Device selection - modified to use QRadioButton
@@ -383,17 +413,68 @@ class TrainingApp(QMainWindow):
         index = self.resnet_variant_combo.findText(selected_variant)
         if index >= 0:
             self.resnet_variant_combo.setCurrentIndex(index)
+            
+        # 加载 VGG 变体
+        self.vgg_variant_combo.clear()
+        self.vgg_variant_combo.addItems(
+            self.default_config.get("vgg_variants", ["vgg16"])
+        )
+        
+        # 设置选择的 VGG 变体
+        selected_vgg_variant = self.default_config.get(
+            "selected_vgg_variant", "vgg16"
+        )
+        index = self.vgg_variant_combo.findText(selected_vgg_variant)
+        if index >= 0:
+            self.vgg_variant_combo.setCurrentIndex(index)
+            
+        # 加载 DenseNet 变体
+        self.densenet_variant_combo.clear()
+        self.densenet_variant_combo.addItems(
+            self.default_config.get("densenet_variants", ["densenet121"])
+        )
+        
+        # 设置选择的 DenseNet 变体
+        selected_densenet_variant = self.default_config.get(
+            "selected_densenet_variant", "densenet121"
+        )
+        index = self.densenet_variant_combo.findText(selected_densenet_variant)
+        if index >= 0:
+            self.densenet_variant_combo.setCurrentIndex(index)
+            
+        # 加载 EfficientNet 变体
+        self.efficientnet_variant_combo.clear()
+        self.efficientnet_variant_combo.addItems(
+            self.default_config.get("efficientnet_variants", ["efficientnet-b0"])
+        )
+        
+        # 设置选择的 EfficientNet 变体
+        selected_efficientnet_variant = self.default_config.get(
+            "selected_efficientnet_variant", "efficientnet-b0"
+        )
+        index = self.efficientnet_variant_combo.findText(selected_efficientnet_variant)
+        if index >= 0:
+            self.efficientnet_variant_combo.setCurrentIndex(index)
 
         # 连接模型更改信号
         self.model_combo.currentTextChanged.connect(self.on_model_changed)
 
-        # 连接ResNet变体更改信号
+        # 连接模型变体更改信号
         self.resnet_variant_combo.currentTextChanged.connect(
-            self.on_resnet_variant_changed
+            self.on_model_variant_changed
+        )
+        self.vgg_variant_combo.currentTextChanged.connect(
+            self.on_model_variant_changed
+        )
+        self.densenet_variant_combo.currentTextChanged.connect(
+            self.on_model_variant_changed
+        )
+        self.efficientnet_variant_combo.currentTextChanged.connect(
+            self.on_model_variant_changed
         )
 
-        # 根据当前选择的模型显示或隐藏ResNet变体选择
-        self.update_resnet_variant_visibility(selected_model)
+        # 根据当前选择的模型显示或隐藏对应的变体选择
+        self.update_model_variant_visibility(selected_model)
 
     def browse_data_dir(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Data Directory")
@@ -436,8 +517,8 @@ class TrainingApp(QMainWindow):
 
     def on_model_changed(self, model_name):
         """Handle model selection change"""
-        # Update ResNet variant selection visibility
-        self.update_resnet_variant_visibility(model_name)
+        # Update model variant selection visibility
+        self.update_model_variant_visibility(model_name)
 
         # Show pretraining settings only if Autoencoder is selected
         self.pretrain_group.setVisible(model_name == "Autoencoder")
@@ -445,17 +526,19 @@ class TrainingApp(QMainWindow):
         # Update output directory path
         self.update_output_dir_path()
 
-    def on_resnet_variant_changed(self, variant_name):
-        """Handle ResNet variant selection change"""
+    def on_model_variant_changed(self, variant_name):
+        """Handle model variant selection change"""
         # No need to update visibility, just update configs for checkpoint path
         selected_model = self.model_combo.currentText()
-        if selected_model == "resnet":
-            # Update output directory path according to the selected variant
-            self.update_output_dir_path()
+        # Update output directory path according to the selected variant
+        self.update_output_dir_path()
 
-    def update_resnet_variant_visibility(self, model_name):
-        """Show or hide ResNet variant selection based on model type"""
+    def update_model_variant_visibility(self, model_name):
+        """Show or hide model variant selection based on model type"""
         self.resnet_variant_group.setVisible(model_name == "resnet")
+        self.vgg_variant_group.setVisible(model_name == "vgg")
+        self.densenet_variant_group.setVisible(model_name == "densenet")
+        self.efficientnet_variant_group.setVisible(model_name == "efficientnet")
 
     def update_output_dir_path(self):
         """Update output directory based on current selections"""
@@ -467,6 +550,12 @@ class TrainingApp(QMainWindow):
         # Get the actual model name for the output path
         if model == "resnet":
             model = self.resnet_variant_combo.currentText()
+        elif model == "vgg":
+            model = self.vgg_variant_combo.currentText()
+        elif model == "densenet":
+            model = self.densenet_variant_combo.currentText()
+        elif model == "efficientnet":
+            model = self.efficientnet_variant_combo.currentText()
 
         # Get the base directory from config
         base_dir = self.default_config["train"].get("output_dir", "./ckpts")
@@ -487,6 +576,12 @@ class TrainingApp(QMainWindow):
             actual_model = selected_model
             if selected_model == "resnet":
                 actual_model = self.resnet_variant_combo.currentText()
+            elif selected_model == "vgg":
+                actual_model = self.vgg_variant_combo.currentText()
+            elif selected_model == "densenet":
+                actual_model = self.densenet_variant_combo.currentText()
+            elif selected_model == "efficientnet":
+                actual_model = self.efficientnet_variant_combo.currentText()
 
             # Set device
             if self.device_cpu.isChecked():

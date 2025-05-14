@@ -38,6 +38,18 @@ class Configs:
         # ResNet variant configuration
         self.resnet_variants = cfg.get("resnet_variants", ["resnet18"])
         self.selected_resnet_variant = cfg.get("selected_resnet_variant", "resnet18")
+        
+        # VGG variant configuration
+        self.vgg_variants = cfg.get("vgg_variants", ["vgg16"])
+        self.selected_vgg_variant = cfg.get("selected_vgg_variant", "vgg16")
+        
+        # DenseNet variant configuration
+        self.densenet_variants = cfg.get("densenet_variants", ["densenet121"])
+        self.selected_densenet_variant = cfg.get("selected_densenet_variant", "densenet121")
+        
+        # EfficientNet variant configuration
+        self.efficientnet_variants = cfg.get("efficientnet_variants", ["efficientnet-b0"])
+        self.selected_efficientnet_variant = cfg.get("selected_efficientnet_variant", "efficientnet-b0")
 
         self.training_config: dict[str, Any] = cfg.get(
             "train",
@@ -54,6 +66,9 @@ class Configs:
             "selected_dataset": self.selected_dataset,
             "selected_model": self.selected_model,
             "selected_resnet_variant": self.selected_resnet_variant,
+            "selected_vgg_variant": self.selected_vgg_variant,
+            "selected_densenet_variant": self.selected_densenet_variant,
+            "selected_efficientnet_variant": self.selected_efficientnet_variant,
             "training_config": self.training_config,
             "test_config": self.test_config,
         }

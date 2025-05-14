@@ -89,6 +89,36 @@ class SingleImageApp(QMainWindow):
         self.resnet_variant_group.setVisible(False)  # Default hidden
         model_layout.addWidget(self.resnet_variant_group)
 
+        # VGG变体选择下拉框
+        self.vgg_variant_group = QWidget()
+        vgg_variant_layout = QVBoxLayout()
+        vgg_variant_layout.addWidget(QLabel("VGG Variant:"))
+        self.vgg_variant_combo = QComboBox()
+        vgg_variant_layout.addWidget(self.vgg_variant_combo)
+        self.vgg_variant_group.setLayout(vgg_variant_layout)
+        self.vgg_variant_group.setVisible(False)  # Default hidden
+        model_layout.addWidget(self.vgg_variant_group)
+        
+        # DenseNet变体选择下拉框
+        self.densenet_variant_group = QWidget()
+        densenet_variant_layout = QVBoxLayout()
+        densenet_variant_layout.addWidget(QLabel("DenseNet Variant:"))
+        self.densenet_variant_combo = QComboBox()
+        densenet_variant_layout.addWidget(self.densenet_variant_combo)
+        self.densenet_variant_group.setLayout(densenet_variant_layout)
+        self.densenet_variant_group.setVisible(False)  # Default hidden
+        model_layout.addWidget(self.densenet_variant_group)
+        
+        # EfficientNet变体选择下拉框
+        self.efficientnet_variant_group = QWidget()
+        efficientnet_variant_layout = QVBoxLayout()
+        efficientnet_variant_layout.addWidget(QLabel("EfficientNet Variant:"))
+        self.efficientnet_variant_combo = QComboBox()
+        efficientnet_variant_layout.addWidget(self.efficientnet_variant_combo)
+        self.efficientnet_variant_group.setLayout(efficientnet_variant_layout)
+        self.efficientnet_variant_group.setVisible(False)  # Default hidden
+        model_layout.addWidget(self.efficientnet_variant_group)
+
         self.ckpt_path_edit = QLineEdit()
         model_layout.addWidget(QLabel("Checkpoint Path:"))
         model_layout.addWidget(self.ckpt_path_edit)
@@ -175,17 +205,56 @@ class SingleImageApp(QMainWindow):
         index = self.resnet_variant_combo.findText(selected_variant)
         if index >= 0:
             self.resnet_variant_combo.setCurrentIndex(index)
+            
+        # 加载 VGG 变体
+        self.vgg_variant_combo.clear()
+        self.vgg_variant_combo.addItems(self.config.vgg_variants)
+        
+        # 设置选择的 VGG 变体
+        selected_vgg_variant = self.config.selected_vgg_variant
+        index = self.vgg_variant_combo.findText(selected_vgg_variant)
+        if index >= 0:
+            self.vgg_variant_combo.setCurrentIndex(index)
+            
+        # 加载 DenseNet 变体
+        self.densenet_variant_combo.clear()
+        self.densenet_variant_combo.addItems(self.config.densenet_variants)
+        
+        # 设置选择的 DenseNet 变体
+        selected_densenet_variant = self.config.selected_densenet_variant
+        index = self.densenet_variant_combo.findText(selected_densenet_variant)
+        if index >= 0:
+            self.densenet_variant_combo.setCurrentIndex(index)
+            
+        # 加载 EfficientNet 变体
+        self.efficientnet_variant_combo.clear()
+        self.efficientnet_variant_combo.addItems(self.config.efficientnet_variants)
+        
+        # 设置选择的 EfficientNet 变体
+        selected_efficientnet_variant = self.config.selected_efficientnet_variant
+        index = self.efficientnet_variant_combo.findText(selected_efficientnet_variant)
+        if index >= 0:
+            self.efficientnet_variant_combo.setCurrentIndex(index)
 
         # Connect model change signal
         self.model_combo.currentTextChanged.connect(self.on_model_changed)
 
-        # Connect ResNet variant change signal
+        # Connect model variant change signals
         self.resnet_variant_combo.currentTextChanged.connect(
-            self.on_resnet_variant_changed
+            self.on_model_variant_changed
+        )
+        self.vgg_variant_combo.currentTextChanged.connect(
+            self.on_model_variant_changed
+        )
+        self.densenet_variant_combo.currentTextChanged.connect(
+            self.on_model_variant_changed
+        )
+        self.efficientnet_variant_combo.currentTextChanged.connect(
+            self.on_model_variant_changed
         )
 
-        # 根据当前选择的模型显示或隐藏ResNet变体选择
-        self.update_resnet_variant_visibility(selected_model)
+        # 根据当前选择的模型显示或隐藏相应变体选择
+        self.update_model_variant_visibility(selected_model)
 
         # Update the checkpoint path
         self.update_checkpoint_path()
@@ -204,24 +273,26 @@ class SingleImageApp(QMainWindow):
     def on_model_changed(self, model_name):
         """Handle model type selection change"""
         # Update ResNet variant selection visibility
-        self.update_resnet_variant_visibility(model_name)
+        self.update_model_variant_visibility(model_name)
         # Update checkpoint path
         self.update_checkpoint_path()
         # Clear previous results
         self.clear_result()
 
-    def on_resnet_variant_changed(self, variant_name):
-        """Handle ResNet variant selection change"""
+    def on_model_variant_changed(self, variant_name):
+        """Handle model variant selection change"""
         selected_model = self.model_combo.currentText()
-        if selected_model == "resnet":
-            # Update checkpoint path based on the selected variant
-            self.update_checkpoint_path()
-            # Clear previous results
-            self.clear_result()
+        # Update checkpoint path based on the selected variant
+        self.update_checkpoint_path()
+        # Clear previous results
+        self.clear_result()
 
-    def update_resnet_variant_visibility(self, model_name):
-        """Show or hide ResNet variant selection based on model type"""
+    def update_model_variant_visibility(self, model_name):
+        """Show or hide model variant selection based on model type"""
         self.resnet_variant_group.setVisible(model_name == "resnet")
+        self.vgg_variant_group.setVisible(model_name == "vgg")
+        self.densenet_variant_group.setVisible(model_name == "densenet")
+        self.efficientnet_variant_group.setVisible(model_name == "efficientnet")
 
     def update_checkpoint_path(self):
         """Update checkpoint path based on selected dataset and model"""
@@ -232,9 +303,14 @@ class SingleImageApp(QMainWindow):
         actual_model = model
         if model == "resnet":
             actual_model = self.resnet_variant_combo.currentText()
-
+        elif model == "vgg":
+            actual_model = self.vgg_variant_combo.currentText()
+        elif model == "densenet":
+            actual_model = self.densenet_variant_combo.currentText()
+        elif model == "efficientnet":
+            actual_model = self.efficientnet_variant_combo.currentText()
         # For autoencoder, we need to handle the checkpoint path differently
-        if model == "Autoencoder":
+        elif model == "Autoencoder":
             actual_model = "autoencoder"
 
         ckpt_path = f"./ckpts/{dataset}/{actual_model}/latest.pth"
@@ -299,6 +375,12 @@ class SingleImageApp(QMainWindow):
             actual_model = selected_model
             if selected_model == "resnet":
                 actual_model = self.resnet_variant_combo.currentText()
+            elif selected_model == "vgg":
+                actual_model = self.vgg_variant_combo.currentText()
+            elif selected_model == "densenet":
+                actual_model = self.densenet_variant_combo.currentText()
+            elif selected_model == "efficientnet":
+                actual_model = self.efficientnet_variant_combo.currentText()
 
             # Update current selected dataset
             selected_dataset = self.dataset_combo.currentText()
