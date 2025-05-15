@@ -71,9 +71,22 @@ class Autoencoder(nn.Module):
         )
 
     def encoder_decoder(self, x):
+        # 保存原始输入尺寸
+        original_size = (x.size(2), x.size(3))
+        
         # Autoencoder path - returns reconstructed image
         encoded = self.encoder(x)
         decoded = self.decoder(encoded)
+        
+        # 检查尺寸是否匹配，如果不匹配则调整解码器输出尺寸
+        if decoded.size(2) != original_size[0] or decoded.size(3) != original_size[1]:
+            decoded = F.interpolate(
+                decoded, 
+                size=original_size,
+                mode='bilinear', 
+                align_corners=False
+            )
+        
         return decoded
 
     def forward(self, x):
@@ -93,12 +106,21 @@ class Autoencoder(nn.Module):
     ):
         """Pre-train the autoencoder part"""
         self.train()
-
+        
+        # 导入time模块
+        import time
+        
         # Use MSE loss for image reconstruction
         criterion = nn.MSELoss()
-
+        
+        # 记录总训练时间
+        total_training_time = 0
+        
         current_iter = 0
         for epoch in range(epochs):
+            # 记录每个epoch的开始时间
+            epoch_start_time = time.time()
+            
             total_loss = 0
             batch_count = 0
 
@@ -129,8 +151,13 @@ class Autoencoder(nn.Module):
                         current_iter, total_iterations, -epoch - 1
                     )  # Negative epoch to indicate pre-training
 
-            # Print average loss after each epoch
+            # 计算epoch耗时
+            epoch_time = time.time() - epoch_start_time
+            total_training_time += epoch_time
+            
+            # Print average loss and time after each epoch
             avg_loss = total_loss / batch_count
-            print(f"Autoencoder Epoch {epoch+1}/{epochs}, Avg Loss: {avg_loss:.6f}")
+            print(f"Autoencoder Epoch {epoch+1}/{epochs}, Avg Loss: {avg_loss:.6f}, Time: {epoch_time:.2f}s")
 
-        print(f"Autoencoder pre-training completed after {epochs} epochs")
+        # 输出总训练时间
+        print(f"Autoencoder pre-training completed after {epochs} epochs. Total time: {total_training_time:.2f}s, Average: {total_training_time/epochs:.2f}s/epoch")

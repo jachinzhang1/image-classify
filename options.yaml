@@ -77,6 +77,10 @@ train:
   pretrain_epochs: 5  
   pretrain_lr: !!float 1e-3  
 
+  save_checkpoints: true  
+  checkpoints_epochs: [1, 5, 10] 
+
+
 test:
   batch_size: 64
   ckpt_path: ckpts/cifar10/lightweight_attn/latest.pth

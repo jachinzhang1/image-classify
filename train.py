@@ -73,6 +73,10 @@ def main(
     best_epoch = 0
     best_state_dict = None
 
+    # checkpoints
+    save_checkpoints = cfg.training_config.get("save_checkpoints", True)
+    checkpoints_epochs = cfg.training_config.get("checkpoints_epochs", []) if save_checkpoints else []
+
     # Training loop
     for epoch in range(n_epochs):
         if controller and getattr(controller, "should_stop", False):
@@ -129,7 +133,17 @@ def main(
         print(
             f"Epoch {epoch+1}/{n_epochs} Loss: {epoch_loss:.3f} Acc: {epoch_acc:.2%} Time: {toc-tic:.1f}s"
         )
+        
+        # 保存特定epoch的模型
 
+        if save_checkpoints and  epoch + 1 in checkpoints_epochs: 
+            print("Saving checkpoint...")
+            checkpoint_dir = os.path.join(output_base, f"epoch_{epoch+1}")
+            os.makedirs(checkpoint_dir, exist_ok=True)
+            checkpoint_path = os.path.join(checkpoint_dir, f"model_epoch_{epoch+1}.pth")
+            torch.save(model.state_dict(), checkpoint_path)
+            print(f"Saved checkpoint at epoch {epoch+1} to {checkpoint_path}")
+            
         # Check if this is the best model so far
         if epoch_acc > best_acc:
             best_acc = epoch_acc
